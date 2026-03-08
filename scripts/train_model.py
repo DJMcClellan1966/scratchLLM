@@ -22,6 +22,9 @@ def main() -> None:
     ap.add_argument("--epochs", type=int, default=None)
     ap.add_argument("--batch-size", type=int, default=None)
     ap.add_argument("--device", default="cpu")
+    ap.add_argument("--use-tier-tags", action="store_true", help="Prepend [USER] to corpus chunks")
+    ap.add_argument("--use-truth-base-mixing", action="store_true", help="Randomly prefix some chunks with [FACT] truth base")
+    ap.add_argument("--truth-base", type=Path, default=None, help="Path to truth_base.jsonl for mixing")
     args = ap.parse_args()
 
     corpus_dir = Path(args.corpus_dir)
@@ -50,6 +53,9 @@ def main() -> None:
         max_epochs=args.epochs or 3,
         output_dir=corpus_dir / "checkpoints",
         device=args.device,
+        use_tier_tags=args.use_tier_tags,
+        use_truth_base_mixing=args.use_truth_base_mixing,
+        truth_base_path=args.truth_base if args.truth_base is not None else (ROOT / "base" / "truth_base.jsonl") if args.use_truth_base_mixing else None,
     )
     if args.batch_size is not None:
         train_config.batch_size = args.batch_size

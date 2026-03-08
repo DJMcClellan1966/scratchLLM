@@ -19,4 +19,9 @@ dev = ["pytest", "ruff"]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["config*", "data*", "tokenizer*", "model*", "train*", "inference*"]
+include = ["config*", "data*", "base*", "tokenizer*", "model*", "train*", "inference*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-v --tb=short"

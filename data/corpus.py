@@ -5,6 +5,12 @@ from dataclasses import dataclass, field, asdict
 from typing import Any, Optional
 
 from .schema import Document
+
+try:
+    from base.tiers import tier_from_source
+except ImportError:
+    def tier_from_source(source: str) -> int:
+        return 3  # inference
 from .infer import bookmarks_to_docs, readings_to_docs
 from .fetch import fetch_urls_to_docs, allowlist_domain
 from .sources.text_files import load_text_files
@@ -12,6 +18,8 @@ from .sources.email import load_email
 from .sources.social import load_social
 from .sources.bookmarks import load_bookmarks
 from .sources.readings import load_readings
+from .sources.dictionary import load_dictionary
+from .sources.bible_commentary import load_bible_commentary
 
 
 @dataclass
@@ -46,11 +54,14 @@ def build_corpus(
     social_paths: Optional[list[str | Path]] = None,
     bookmark_paths: Optional[list[str | Path]] = None,
     reading_paths: Optional[list[str | Path]] = None,
+    dictionary_paths: Optional[list[str | Path]] = None,
+    bible_commentary_paths: Optional[list[str | Path]] = None,
     fetch_bookmark_urls: bool = False,
     fetch_delay: float = 1.0,
     fetch_allowlist: Optional[list[str]] = None,
     out_dir: Optional[str | Path] = None,
     estimate_tokens: bool = True,
+    tier_map: Optional[dict[str, int]] = None,
 ) -> tuple[list[Document], CorpusManifest]:
     """
     Run all source loaders, infer from bookmarks/readings, optionally fetch URLs.
@@ -61,6 +72,8 @@ def build_corpus(
     social_paths = social_paths or []
     bookmark_paths = bookmark_paths or []
     reading_paths = reading_paths or []
+    dictionary_paths = dictionary_paths or []
+    bible_commentary_paths = bible_commentary_paths or []
 
     docs: list[Document] = []
     paths_used: dict[str, list[str]] = {}
@@ -92,6 +105,16 @@ def build_corpus(
     inferred_reading_docs = readings_to_docs(reading_records)
     docs.extend(inferred_reading_docs)
 
+    if dictionary_paths:
+        dict_docs = load_dictionary(dictionary_paths)
+        docs.extend(dict_docs)
+        paths_used["dictionary"] = [str(Path(p).resolve()) for p in dictionary_paths]
+
+    if bible_commentary_paths:
+        bc_docs = load_bible_commentary(bible_commentary_paths)
+        docs.extend(bc_docs)
+        paths_used["bible_commentary"] = [str(Path(p).resolve()) for p in bible_commentary_paths]
+
     if fetch_bookmark_urls and bookmark_records:
         url_title = [
             (r["url"], r.get("title", ""))
@@ -100,6 +123,14 @@ def build_corpus(
         ]
         fetched = fetch_urls_to_docs(url_title, delay=fetch_delay)
         docs.extend(fetched)
+
+    # Assign tier to each doc (for retrieval by tier). Persisted in meta.
+    for i, doc in enumerate(docs):
+        tier = (tier_map.get(doc.source, tier_from_source(doc.source)) if tier_map
+                else tier_from_source(doc.source))
+        meta = dict(doc.meta or {})
+        meta["tier"] = tier
+        docs[i] = Document(text=doc.text, source=doc.source, meta=meta)
 
     n_docs = len(docs)
     n_chars = sum(len(d.text) for d in docs)

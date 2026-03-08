@@ -1,0 +1,6 @@
+[submodule "dictionary"]
+	path = dictionary
+	url = https://github.com/DJMcClellan1966/dictionary.git
+[submodule "bible_commentary"]
+	path = bible_commentary
+	url = https://github.com/DJMcClellan1966/bible-commentary.git

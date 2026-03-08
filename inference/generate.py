@@ -8,6 +8,13 @@ from config.scaling import ModelScale
 from model.gpt import GPT
 from tokenizer import BPETokenizer, load_tokenizer
 
+try:
+    from base.retrieve import retrieve_for_prompt
+    from base.structure import format_context
+    _HAS_BASE = True
+except ImportError:
+    _HAS_BASE = False
+
 
 def load_model_and_tokenizer(
     checkpoint_path: str | Path,
@@ -101,3 +108,50 @@ def generate(
             if eos_id is not None and next_id == eos_id:
                 break
     return tokenizer.decode(ids)
+
+
+def generate_with_base(
+    model: GPT,
+    tokenizer: BPETokenizer,
+    prompt: str,
+    truth_base_path: Optional[str | Path] = None,
+    corpus_path: Optional[str | Path] = None,
+    use_base: bool = True,
+    use_meaning: bool = False,
+    max_new_tokens: int = 100,
+    temperature: float = 0.8,
+    top_k: Optional[int] = 40,
+    truth_top_k: int = 5,
+    corpus_top_k: int = 5,
+) -> str:
+    """
+    Generate with optional meaning base: retrieve from truth base + corpus, format with
+    [FACT]/[CONTEXT]/[PROMPT], then run autoregressive generation. If use_meaning is True,
+    retrieval uses the meaning language and conflicts are resolved by tier.
+    """
+    if not _HAS_BASE or not use_base or (not truth_base_path and not corpus_path):
+        return generate(model, tokenizer, prompt, max_new_tokens, temperature, top_k)
+    truth_chunks, corpus_chunks = retrieve_for_prompt(
+        prompt,
+        truth_base_path=truth_base_path,
+        corpus_path=corpus_path,
+        truth_top_k=truth_top_k,
+        corpus_top_k=corpus_top_k,
+        use_meaning=use_meaning,
+        resolve=use_meaning,
+    )
+    formatted = format_context(
+        truth_chunks,
+        corpus_chunks,
+        prompt,
+        tokenizer=tokenizer,
+        context_len=model.context_len,
+    )
+    return generate(
+        model,
+        tokenizer,
+        formatted.context_string,
+        max_new_tokens=max_new_tokens,
+        temperature=temperature,
+        top_k=top_k,
+    )

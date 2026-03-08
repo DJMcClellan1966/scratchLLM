@@ -21,9 +21,40 @@ def main() -> None:
     ap.add_argument("--social", type=Path, nargs="*", default=[], help="Social export JSON files/dirs")
     ap.add_argument("--bookmarks", type=Path, nargs="*", default=[], help="Browser bookmark JSON files")
     ap.add_argument("--readings", type=Path, nargs="*", default=[], help="Reading list export files")
+    ap.add_argument(
+        "--dictionary",
+        type=Path,
+        nargs="*",
+        default=[],
+        help="Dictionary JSON/CSV/txt files or dirs (e.g. dictionary/)",
+    )
+    ap.add_argument(
+        "--dictionary-default",
+        action="store_true",
+        help="Add in-repo dictionary/ as dictionary source (convenience)",
+    )
+    ap.add_argument(
+        "--bible-commentary",
+        type=Path,
+        nargs="*",
+        default=[],
+        help="Bible-commentary .txt/.md dirs (e.g. bible_commentary/)",
+    )
+    ap.add_argument(
+        "--bible-commentary-default",
+        action="store_true",
+        help="Add in-repo bible_commentary/ as corpus source (convenience)",
+    )
     ap.add_argument("--fetch-urls", action="store_true", help="Fetch content from bookmark URLs")
     ap.add_argument("--fetch-delay", type=float, default=1.0, help="Delay between URL fetches (seconds)")
     args = ap.parse_args()
+
+    dict_paths = list(args.dictionary)
+    if args.dictionary_default:
+        dict_paths.append(ROOT / "dictionary")
+    bc_paths = list(args.bible_commentary)
+    if args.bible_commentary_default:
+        bc_paths.append(ROOT / "bible_commentary")
 
     docs, manifest = build_corpus(
         text_paths=[str(p) for p in args.text],
@@ -31,6 +62,8 @@ def main() -> None:
         social_paths=[str(p) for p in args.social],
         bookmark_paths=[str(p) for p in args.bookmarks],
         reading_paths=[str(p) for p in args.readings],
+        dictionary_paths=[str(p) for p in dict_paths],
+        bible_commentary_paths=[str(p) for p in bc_paths],
         fetch_bookmark_urls=args.fetch_urls,
         fetch_delay=args.fetch_delay,
         out_dir=args.out_dir,

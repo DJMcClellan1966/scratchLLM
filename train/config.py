@@ -15,6 +15,9 @@ class TrainConfig:
     output_dir: str | Path = "checkpoints"
     device: str = "cpu"
     seed: Optional[int] = 42
+    use_tier_tags: bool = False
+    use_truth_base_mixing: bool = False
+    truth_base_path: Optional[str | Path] = None
 
     @classmethod
     def from_scale(cls, n_tokens: int, context_len: int, **overrides) -> "TrainConfig":

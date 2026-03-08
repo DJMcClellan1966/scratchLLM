@@ -56,6 +56,9 @@ def train_model(
         corpus_dir / "corpus.jsonl",
         tokenizer,
         train_config.context_len,
+        use_tier_tags=getattr(train_config, "use_tier_tags", False),
+        use_truth_base_mixing=getattr(train_config, "use_truth_base_mixing", False),
+        truth_base_path=getattr(train_config, "truth_base_path", None),
     )
     if len(dataset) == 0:
         raise ValueError("Dataset is empty; check corpus and tokenizer.")
