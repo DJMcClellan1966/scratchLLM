@@ -1,4 +1,11 @@
 {
+  "bible_daily": {
+    "id": "bible_daily",
+    "label": "Bible & daily reading",
+    "default_truth_base": null,
+    "default_ir": null,
+    "default_max_tier": 2
+  },
   "general": {
     "id": "general",
     "label": "General",

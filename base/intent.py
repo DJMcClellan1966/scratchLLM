@@ -8,7 +8,8 @@ import unicodedata
 from pathlib import Path
 from typing import Any, Optional
 
-from .truth_base import Statement, save_truth_base
+from .truth_base import Statement, load_truth_base, save_truth_base
+from .ir_bridge import load_ir_jsonl
 
 
 # Default blocklist: terms that suggest illegal or immoral use. Intent is rejected if it matches.
@@ -64,18 +65,30 @@ def _normalize_for_match(text: str) -> str:
     return text
 
 
+# Strong terms: if intent contains any of these, prefer this template over others (avoids e.g. "journal" matching when user said "bible reading").
+_TEMPLATE_PRIORITY_TERMS: dict[str, list[str]] = {
+    "bible_daily": ["bible", "scripture", "devotional", "bible reading", "read the bible"],
+}
+
+
 def get_template_for_intent(
     intent: str,
     templates: Optional[dict[str, dict[str, Any]]] = None,
 ) -> Optional[str]:
     """
     Match intent to a template by keywords. Returns template_id or None (use generic).
+    When intent contains priority terms for a template (e.g. "bible"), that template wins.
     """
     templates = templates or load_intent_templates()
     if not templates:
         return None
     normalized = _normalize_for_match(intent)
     intent_words = set(re.findall(r"[a-z]+", normalized))
+    for tid, terms in _TEMPLATE_PRIORITY_TERMS.items():
+        if tid not in templates:
+            continue
+        if any(term in normalized or all(w in intent_words for w in term.split()) for term in terms):
+            return tid
     best_id: Optional[str] = None
     best_score = 0
     for tid, t in templates.items():
@@ -110,28 +123,67 @@ def _statements_from_template(
     return out
 
 
+def _load_merge_statements(
+    path: str | Path,
+    base_dir: Optional[Path] = None,
+    limit: int = 500,
+) -> list[Statement]:
+    """Load statements from a truth base or IR JSONL path; return up to limit."""
+    base_dir = base_dir or Path(__file__).resolve().parent.parent
+    resolved = base_dir / path if not Path(str(path)).is_absolute() else Path(path)
+    if not resolved.exists():
+        return []
+    out: list[Statement] = []
+    if resolved.suffix == ".jsonl":
+        with open(resolved, encoding="utf-8") as f:
+            first_line = f.readline()
+        try:
+            first = json.loads(first_line) if first_line.strip() else {}
+        except json.JSONDecodeError:
+            first = {}
+        if "subject" in first or "definition" in first:
+            out = load_ir_jsonl(resolved)
+        else:
+            out = load_truth_base(resolved, parse_meaning_if_missing=False)
+    if limit and len(out) > limit:
+        out = out[:limit]
+    return out
+
+
 def build_quick_corpus(
     intent: str,
     templates: Optional[dict[str, dict[str, Any]]] = None,
     templates_path: Optional[str | Path] = None,
     add_goal_statement: bool = True,
+    base_dir: Optional[Path] = None,
+    blank_canvas: bool = False,
 ) -> list[Statement]:
     """
-    Build a quick corpus from user intent: match a template (or generic) and optionally add a goal statement.
+    Build a quick corpus from user intent. If blank_canvas is True, return only the user's goal
+    statement (no template, no merge) so the app is a blank canvas built from their input over time.
+    Otherwise match a template (or generic), add goal statement, and optional merge_ir / merge_truth_base.
     """
+    goal_only = Statement(
+        text=f"Your stated goal: {intent.strip() or 'General help'}",
+        tier=2,
+        source="user",
+        category="intent",
+    )
+    if blank_canvas:
+        return [goal_only]
     templates = templates or load_intent_templates(templates_path)
     template_id = get_template_for_intent(intent, templates)
     template = (templates.get(template_id) or templates.get("general")) if templates else None
     if not template:
-        # No templates: minimal corpus from intent only
-        st = Statement(
-            text=f"Your stated goal: {intent.strip() or 'General help'}",
-            tier=2,
-            source="user",
-            category="intent",
-        )
-        return [st]
-    return _statements_from_template(template, intent, add_goal_statement=add_goal_statement)
+        return [goal_only]
+    statements = _statements_from_template(template, intent, add_goal_statement=add_goal_statement)
+    merge_limit = int(template.get("merge_limit", 500))
+    for key in ("merge_truth_base", "merge_ir"):
+        path = template.get(key)
+        if path and isinstance(path, str):
+            extra = _load_merge_statements(path, base_dir=base_dir, limit=merge_limit)
+            statements.extend(extra)
+    return statements
 
 
 def _slug_from_intent(intent: str, max_len: int = 40) -> str:
@@ -148,15 +200,22 @@ def create_helper_from_intent(
     out_dir: str | Path,
     templates_path: Optional[str | Path] = None,
     helper_id: Optional[str] = None,
+    base_dir: Optional[Path] = None,
+    blank_canvas: bool = False,
 ) -> tuple[str, Path, int]:
     """
     Run guardrails, build quick corpus, save to out_dir/<id>/ and return (helper_id, truth_base_path, statement_count).
     Raises ValueError if guardrails reject the intent.
+    If blank_canvas is True, the helper contains only the user's goal (no template content); the app is a blank canvas.
+    Otherwise templates may specify merge_ir or merge_truth_base to merge in dictionary/IR content.
     """
     allowed, msg = check_guardrails(intent)
     if not allowed:
         raise ValueError(msg)
-    statements = build_quick_corpus(intent, templates_path=templates_path)
+    base_dir = base_dir or Path(__file__).resolve().parent.parent
+    statements = build_quick_corpus(
+        intent, templates_path=templates_path, base_dir=base_dir, blank_canvas=blank_canvas
+    )
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     slug = helper_id or _slug_from_intent(intent)

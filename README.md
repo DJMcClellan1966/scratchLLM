@@ -64,14 +64,14 @@ python scripts/run_fast_response.py --query "What is X?" --truth-base base/truth
 # or with IR: --ir path/to/pregenerated_ir.jsonl
 ```
 
-**Create helper from intent (primary):** Describe what you want help with; the app builds a quick corpus and uses it locally. Nothing illegal or immoral.
+**Create helper from intent (primary):** Describe what you want help with; the app starts as a blank canvas (only your goal). It grows from what you add; no preset corpus. Nothing illegal or immoral.
 
 ```bash
-python scripts/create_helper_from_intent.py "I want to junk journal"
-# Creates corpus/user_helpers/<id>/truth_base.jsonl; use that path or the GUI.
+python scripts/create_helper_from_intent.py "I want to read the bible daily"
+# Creates corpus/user_helpers/<id>/truth_base.jsonl; use that path or the GUI. GUI creates blank-canvas helpers (goal only); CLI uses templates.
 ```
 
-**GUI (Align):** `python scripts/run_gui.py` — **What do you want help with?** (create a helper from your intent) or choose a **Helper** (My helpers or Prebuilt verticals). Query, truth-base/IR paths, Run and Check consistency. After creating a helper, use it with no internet.
+**GUI (Align):** `python scripts/run_gui.py` — Opens on a welcome screen. Type what you want help with and click **Get started** to create a blank-canvas helper (only your goal; no preset content). Or open an existing helper or explore a sample. Use it with no internet after creation.
 
 **Consistency check:** `python scripts/check_consistency.py --truth-base base/truth_base.jsonl` (or `--ir path/to/ir.jsonl`). Exit 0 if consistent, 1 if not.
 

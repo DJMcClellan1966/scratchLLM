@@ -26,22 +26,33 @@ def main() -> None:
         except Exception:
             return []
 
-    def get_template_label_and_placeholder(intent: str) -> tuple[str, str]:
-        """Return (friendly_label, placeholder) for intent. Uses templates if available."""
+    def get_template_theme(intent: str) -> dict:
+        """Return theme dict: label, placeholder, welcome_headline, accent_color, default_actions, default_action_queries."""
         try:
             from base.intent import load_intent_templates, get_template_for_intent
             templates = load_intent_templates()
             tid = get_template_for_intent(intent, templates)
             if tid and tid in templates:
                 t = templates[tid]
-                label = t.get("label", "Align")
-                placeholder = t.get("placeholder", "Ask anything…")
-                return (label, placeholder)
+                return {
+                    "label": t.get("label", "Align"),
+                    "placeholder": t.get("placeholder", "Ask anything…"),
+                    "welcome_headline": t.get("welcome_headline"),
+                    "accent_color": t.get("accent_color"),
+                    "default_actions": t.get("default_actions") or [],
+                    "default_action_queries": t.get("default_action_queries") or [],
+                }
         except Exception:
             pass
-        # Fallback: short intent or generic
         short = (intent.strip()[:40] + "…") if len(intent.strip()) > 40 else intent.strip()
-        return (short or "Align", "Ask anything…")
+        return {
+            "label": short or "Align",
+            "placeholder": "Ask anything…",
+            "welcome_headline": None,
+            "accent_color": None,
+            "default_actions": [],
+            "default_action_queries": [],
+        }
 
     root = tk.Tk()
     root.title("Align")
@@ -115,12 +126,33 @@ def main() -> None:
         ir_var.set(h.get("ir_path", ""))
         max_tier_var.set(h.get("max_tier", 2))
         header_label.config(text=h.get("display_label", "Align"))
+        try:
+            header_label.config(foreground=h.get("accent_color") or "black")
+        except tk.TclError:
+            pass
+        if welcome_headline_var is not None:
+            welcome_headline_var.set(h.get("welcome_headline") or "")
         ph = h.get("placeholder", "Ask anything…")
         query_entry.delete(0, tk.END)
         query_entry.insert(0, "")
         query_entry.placeholder = ph
         _set_placeholder(query_entry, ph)
         root.title(f"Align — {h.get('display_label', 'Helper')}")
+        actions = h.get("default_actions") or []
+        queries = h.get("default_action_queries") or []
+        for w in actions_frame.winfo_children():
+            w.destroy()
+        for i, label in enumerate(actions):
+            q = queries[i] if i < len(queries) else label
+            btn = ttk.Button(actions_frame, text=label, command=lambda qq=q: _run_preset_query(qq))
+            btn.pack(side=tk.LEFT, padx=(0, 6))
+
+    def _run_preset_query(preset_query: str) -> None:
+        query_var.set(preset_query)
+        _clear_placeholder(query_entry)
+        query_entry.delete(0, tk.END)
+        query_entry.insert(0, preset_query)
+        run_query()
 
     def _set_placeholder(entry: tk.Entry, text: str) -> None:
         try:
@@ -174,19 +206,25 @@ def main() -> None:
             return
         try:
             from base.intent import create_helper_from_intent
-            helper_id, tb_path, count = create_helper_from_intent(intent, out_dir=USER_HELPERS_DIR)
-            label, placeholder = get_template_label_and_placeholder(intent)
+            helper_id, tb_path, count = create_helper_from_intent(
+                intent, out_dir=USER_HELPERS_DIR, blank_canvas=True
+            )
+            short_label = (intent.strip()[:36] + "…") if len(intent.strip()) > 36 else (intent.strip() or "Your helper")
             set_helper({
                 "truth_base_path": str(tb_path),
                 "ir_path": "",
                 "intent": intent,
-                "display_label": label,
-                "placeholder": placeholder,
+                "display_label": short_label,
+                "placeholder": "Ask anything…",
+                "welcome_headline": "",
+                "accent_color": None,
+                "default_actions": [],
+                "default_action_queries": [],
                 "is_prebuilt": False,
                 "helper_id": helper_id,
             })
             show_working_view()
-            messagebox.showinfo("Ready", f"Align is set up with {count} ideas. Ask anything below.")
+            messagebox.showinfo("Ready", "Your canvas is ready. Add your goals and notes over time; Align will use what you add.")
         except ValueError as e:
             messagebox.showerror("Can’t create helper", str(e))
 
@@ -197,14 +235,33 @@ def main() -> None:
         vid = vertical_ids[prebuilt_labels.index(sel)]
         tb_path, ir_path, mt, _ = resolve_vertical(vid, base_dir=ROOT)
         label = verticals_config.get(vid, {}).get("label", sel)
+        try:
+            from base.intent import load_intent_templates
+            templates = load_intent_templates()
+            t = templates.get(vid, {}) if isinstance(templates, dict) else {}
+            theme = {
+                "label": t.get("label", label),
+                "placeholder": t.get("placeholder", "Ask anything…"),
+                "welcome_headline": t.get("welcome_headline"),
+                "accent_color": t.get("accent_color"),
+                "default_actions": t.get("default_actions") or [],
+                "default_action_queries": t.get("default_action_queries") or [],
+            }
+        except Exception:
+            theme = {"label": label, "placeholder": "Ask anything…", "welcome_headline": None, "accent_color": None, "default_actions": [], "default_action_queries": []}
         set_helper({
             "truth_base_path": str(tb_path) if tb_path else "",
             "ir_path": str(ir_path) if ir_path else "",
             "intent": "",
-            "display_label": label,
-            "placeholder": "Ask anything…",
+            "display_label": theme["label"],
+            "placeholder": theme["placeholder"],
+            "welcome_headline": theme.get("welcome_headline"),
+            "accent_color": theme.get("accent_color"),
+            "default_actions": theme.get("default_actions") or [],
+            "default_action_queries": theme.get("default_action_queries") or [],
             "is_prebuilt": True,
             "vertical_id": vid,
+            "max_tier": mt,
         })
         show_working_view()
 
@@ -216,13 +273,17 @@ def main() -> None:
         for h in helpers_now:
             if f"My: {h['helper_id']}" == sel:
                 intent = h.get("intent", "")
-                label, placeholder = get_template_label_and_placeholder(intent)
+                short_label = (intent[:36] + "…") if len(intent) > 36 else (intent or "Your helper")
                 set_helper({
                     "truth_base_path": h["truth_base_path"],
                     "ir_path": "",
                     "intent": intent,
-                    "display_label": label,
-                    "placeholder": placeholder,
+                    "display_label": short_label,
+                    "placeholder": "Ask anything…",
+                    "welcome_headline": "",
+                    "accent_color": None,
+                    "default_actions": [],
+                    "default_action_queries": [],
                     "is_prebuilt": False,
                     "helper_id": h["helper_id"],
                 })
@@ -275,7 +336,7 @@ def main() -> None:
     # ----- Welcome frame -----
     welcome_frame = ttk.Frame(root)
     ttk.Label(welcome_frame, text="What do you want help with?", font=("Segoe UI", 12, "bold")).pack(anchor=tk.W, pady=(0, 8))
-    ttk.Label(welcome_frame, text="Describe it in a sentence. Align will build a helper from that.", foreground="gray").pack(anchor=tk.W, pady=(0, 12))
+    ttk.Label(welcome_frame, text="Start from your words. Align is a blank canvas — it will grow from what you add.", foreground="gray").pack(anchor=tk.W, pady=(0, 12))
     intent_var = tk.StringVar()
     intent_entry = ttk.Entry(welcome_frame, textvariable=intent_var, width=52)
     intent_entry.pack(fill=tk.X, pady=(0, 12))
@@ -302,7 +363,10 @@ def main() -> None:
     # ----- Working frame -----
     working_frame = ttk.Frame(root)
     header_label = ttk.Label(working_frame, text="Align", font=("Segoe UI", 12, "bold"))
-    header_label.pack(anchor=tk.W, pady=(0, 8))
+    header_label.pack(anchor=tk.W, pady=(0, 4))
+    welcome_headline_var = tk.StringVar()
+    welcome_headline_label = ttk.Label(working_frame, textvariable=welcome_headline_var, foreground="gray")
+    welcome_headline_label.pack(anchor=tk.W, pady=(0, 8))
 
     query_var = tk.StringVar()
     query_entry = ttk.Entry(working_frame, textvariable=query_var, width=52)
@@ -312,7 +376,9 @@ def main() -> None:
     query_entry.bind("<FocusOut>", lambda e: _restore_placeholder(query_entry))
     query_entry.bind("<Return>", lambda e: run_query())
 
-    ttk.Button(working_frame, text="Ask", command=run_query).pack(anchor=tk.W, pady=(0, 12))
+    ttk.Button(working_frame, text="Ask", command=run_query).pack(anchor=tk.W, pady=(0, 6))
+    actions_frame = ttk.Frame(working_frame)
+    actions_frame.pack(anchor=tk.W, pady=(0, 12))
 
     ttk.Label(working_frame, text="Answer").pack(anchor=tk.W, pady=(8, 2))
     response_text = scrolledtext.ScrolledText(working_frame, wrap=tk.WORD, width=58, height=14, font=("Segoe UI", 10))
@@ -329,27 +395,8 @@ def main() -> None:
         if p:
             truth_base_var.set(p)
 
-    # Startup: if we have any helper, go straight to working view
-    my_helpers = refresh_my_helpers()
-    if my_helpers:
-        h = my_helpers[0]
-        intent = h.get("intent", "")
-        label, placeholder = get_template_label_and_placeholder(intent)
-        set_helper({
-            "truth_base_path": h["truth_base_path"],
-            "ir_path": "",
-            "intent": intent,
-            "display_label": label,
-            "placeholder": placeholder,
-            "is_prebuilt": False,
-            "helper_id": h["helper_id"],
-        })
-        show_working_view()
-    elif prebuilt_labels:
-        prebuilt_combo.set(prebuilt_labels[0])
-        use_prebuilt()
-    else:
-        welcome_frame.pack(fill=tk.BOTH, expand=True, padx=24, pady=24)
+    # Startup: always show welcome (blank canvas first); user builds the app from their input
+    welcome_frame.pack(fill=tk.BOTH, expand=True, padx=24, pady=24)
 
     intent_entry.focus()
     root.mainloop()

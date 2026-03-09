@@ -1,13 +1,13 @@
 # Intent-driven helper (primary path)
 
-The app supports two ways to get a helper: **describe what you want** (primary) or **use a prebuilt vertical** (secondary). For the primary path, you state your intent in plain language; the app builds a quick corpus and uses it locally.
+The app is a **blank canvas** by default: you describe what you want, and the helper starts with only that goal. The app grows from your input over time. You can also use a prebuilt vertical or (via CLI) a template with preset content.
 
 ## Flow
 
-1. **User states intent** — e.g. "I want to junk journal" or "I'm going on a hike here."
+1. **User states intent** — e.g. "I want help reading the bible daily" or "I want to get into hiking."
 2. **Guardrails** — The app checks that the intent is legal and moral; it refuses to build a corpus for blocked terms.
-3. **Quick corpus** — Intent is matched to a template (e.g. journaling, hiking in `config/intent_templates.json`) or the generic template. A small truth base (statements) is generated and saved under `corpus/user_helpers/<id>/truth_base.jsonl`.
-4. **Use locally** — You run Q&A against that corpus (GUI or CLI). No internet required after creation.
+3. **Quick corpus** — By default the helper is **blank**: only your stated goal is saved (one statement). No preset template content. The truth base is saved under `corpus/user_helpers/<id>/truth_base.jsonl`. (CLI can use templates with `blank_canvas=False` to get preset statements.)
+4. **Use locally** — You run Q&A against that corpus (GUI or CLI). Add goals and notes over time; the app uses what you add.
 
 ## CLI
 
@@ -30,9 +30,9 @@ Options:
 
 In `run_gui.py`:
 
-1. **What do you want help with?** — Type your intent and click **Create helper**. The new helper appears in the **Helper** dropdown and is selected.
-2. **Helper** — Choose a **My:** helper (created from intent) or a **Prebuilt** vertical (General, Medical, Legal, Compliance). Paths are set automatically.
-3. **Query** — Ask a question; the answer is grounded in the selected helper’s corpus.
+1. **Welcome** — App always opens on the welcome screen. **What do you want help with?** — Type your intent and click **Get started**. A new helper is created as a **blank canvas** (only your goal; no template content). The working view opens with a generic "Ask anything…" prompt.
+2. **Or** — Use **Or open an existing helper** to open a previous canvas, or **Or explore a sample** to use a prebuilt vertical.
+3. **Query** — Ask a question; the answer is grounded in the selected helper’s corpus (which you build over time for blank-canvas helpers).
 
 ## Templates
 
@@ -59,11 +59,21 @@ from base.intent import check_guardrails, create_helper_from_intent, list_user_h
 allowed, msg = check_guardrails("I want to junk journal")
 # (True, "OK")
 
+# Blank canvas (default): only the goal statement
+helper_id, truth_base_path, count = create_helper_from_intent(
+    "I want to read the bible",
+    out_dir="corpus/user_helpers",
+    blank_canvas=True,
+)
+# count=1
+
+# With template content (preset statements)
 helper_id, truth_base_path, count = create_helper_from_intent(
     "I want to junk journal",
     out_dir="corpus/user_helpers",
+    blank_canvas=False,
 )
-# helper_id="junk_journal", truth_base_path=Path("corpus/user_helpers/junk_journal/truth_base.jsonl"), count=11
+# count >= 1 (goal + template statements)
 
 helpers = list_user_helpers("corpus/user_helpers")
 # [{"helper_id": "junk_journal", "truth_base_path": "...", "intent": "I want to junk journal"}, ...]

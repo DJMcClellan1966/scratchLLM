@@ -38,6 +38,12 @@ def test_build_quick_corpus():
     assert any("goal" in getattr(s, "text", "").lower() or "journal" in getattr(s, "text", "").lower() for s in statements)
 
 
+def test_build_quick_corpus_blank_canvas():
+    statements = build_quick_corpus("I want to read the bible daily", blank_canvas=True)
+    assert len(statements) == 1
+    assert "goal" in statements[0].text.lower() and "bible" in statements[0].text.lower()
+
+
 def test_create_helper_from_intent():
     with tempfile.TemporaryDirectory() as tmp:
         helper_id, truth_base_path, count = create_helper_from_intent(
@@ -51,6 +57,21 @@ def test_create_helper_from_intent():
         assert count >= 1
         meta = truth_base_path.parent / "meta.json"
         assert meta.exists()
+
+
+def test_create_helper_from_intent_blank_canvas():
+    with tempfile.TemporaryDirectory() as tmp:
+        helper_id, truth_base_path, count = create_helper_from_intent(
+            "I want to read the bible",
+            out_dir=tmp,
+            blank_canvas=True,
+        )
+        assert count == 1
+        assert truth_base_path.exists()
+        with open(truth_base_path, encoding="utf-8") as f:
+            lines = [l for l in f if l.strip()]
+        assert len(lines) == 1
+        assert "goal" in lines[0].lower() and "bible" in lines[0].lower()
 
 
 def test_create_helper_from_intent_guardrails_raise():

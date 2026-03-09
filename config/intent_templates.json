@@ -1,4 +1,24 @@
 {
+  "bible_daily": {
+    "id": "bible_daily",
+    "label": "Bible & daily reading",
+    "placeholder": "Ask about today's reading, reflection, or a passage…",
+    "welcome_headline": "Your daily reading helper",
+    "accent_color": "#4a6fa5",
+    "default_actions": ["Today's reading", "Reflect"],
+    "default_action_queries": ["What should I read today?", "Give me a reflection prompt"],
+    "keywords": ["bible", "daily reading", "devotional", "scripture", "read the bible", "bible daily"],
+    "statements": [
+      {"text": "Daily Bible reading builds a habit: choose a time and place, and start with a short passage.", "tier": 1, "source": "curated", "category": "bible_daily"},
+      {"text": "Reflect after reading: What stood out? How does this apply to today?", "tier": 1, "source": "curated", "category": "bible_daily"},
+      {"text": "You can follow a reading plan (e.g. chronological, thematic) or read one book at a time.", "tier": 2, "source": "curated", "category": "bible_daily"},
+      {"text": "Journal a verse or thought from the passage to remember and apply it.", "tier": 2, "source": "curated", "category": "bible_daily"},
+      {"text": "Prayer and reading go together: pray before for focus, after for application.", "tier": 2, "source": "curated", "category": "bible_daily"},
+      {"text": "Start small: even a few verses daily is better than long sessions rarely.", "tier": 0, "source": "curated", "category": "bible_daily"},
+      {"text": "Reflection prompts: What is God saying here? What should I do differently? What am I grateful for?", "tier": 2, "source": "curated", "category": "bible_daily"},
+      {"text": "Use a study Bible or commentary for difficult passages; look up key terms if needed.", "tier": 2, "source": "curated", "category": "bible_daily"}
+    ]
+  },
   "journaling": {
     "id": "journaling",
     "label": "Journaling & ideas",
@@ -31,6 +51,23 @@
       {"text": "Break in new boots before a long hike to prevent blisters; bring blister treatment just in case.", "tier": 2, "source": "curated", "category": "hiking"},
       {"text": "Hydration: drink before you're thirsty; electrolytes help on long or hot hikes.", "tier": 1, "source": "curated", "category": "hiking"},
       {"text": "If you get lost: stop, stay put if possible, use whistle or signal; three of anything is a distress signal.", "tier": 0, "source": "curated", "category": "hiking"}
+    ]
+  },
+  "yoga": {
+    "id": "yoga",
+    "label": "Yoga & practice",
+    "placeholder": "Ask about poses, breathwork, or a short sequence…",
+    "welcome_headline": "Your practice helper",
+    "accent_color": "#5a7a5a",
+    "keywords": ["yoga", "practice", "poses", "breathwork", "stretch", "mindfulness", "meditation"],
+    "statements": [
+      {"text": "Start with a few minutes of breath awareness or gentle movement to arrive on the mat.", "tier": 1, "source": "curated", "category": "yoga"},
+      {"text": "Warm up the body before deeper poses; listen to your body and skip or modify as needed.", "tier": 0, "source": "curated", "category": "yoga"},
+      {"text": "Breathwork: try equal inhale and exhale, or extended exhale, to calm the nervous system.", "tier": 1, "source": "curated", "category": "yoga"},
+      {"text": "A short daily practice (10–15 minutes) is more sustainable than long sessions rarely.", "tier": 1, "source": "curated", "category": "yoga"},
+      {"text": "Common poses for beginners: Mountain, Down Dog, Child's pose, Cat-Cow, Warrior I.", "tier": 2, "source": "curated", "category": "yoga"},
+      {"text": "Savasana at the end: lie still and let the body absorb the practice.", "tier": 1, "source": "curated", "category": "yoga"},
+      {"text": "Yoga is not about flexibility; it is about awareness, breath, and gradual progress.", "tier": 0, "source": "curated", "category": "yoga"}
     ]
   },
   "general": {
