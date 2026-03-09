@@ -37,6 +37,16 @@ Generic LLMs are trained on huge, mixed corpora. They often:
 
 A model trained mainly on **this user’s** data has a prior that is **their** interests, **their** vocabulary, **their** topics. Wrong or fuzzy answers are still more likely to stay in that space, so the output is more useful and easier to sanity-check against what the user actually has and does.
 
+## Formal layer and design principles
+
+The truth base, meaning language, and consistency machinery follow two principles that keep the system interpretable and robust:
+
+- **Grounding (Tarski-inspired):** We do not define “truth” inside the system itself. Instead we use **tiers** (necessary, empirical, contingent, …) and **sources** as external grounding. Answers are “supported by these axioms” or “tier N,” not “true” in an undefinable sense. The app never claims a self-referential truth predicate.
+
+- **Conflict handling (paraconsistent-inspired):** When axioms conflict (same subject, different object in the meaning layer), we **warn** and optionally **resolve** by tier; we do **not** let “one contradiction” imply “everything follows.” So the system remains useful and auditable even when the knowledge base is not perfectly consistent.
+
+Retrieval can use **lightweight** extra signals: prefer **shorter** definitions when scores tie (simplicity), and optionally boost by **importance** (e.g. from pattern stats: terms used in many definitions). These are tie-breakers only, not full Kolmogorov or information-theory machinery.
+
 ## Implications for the repo
 
 - **Data pipeline** should be built to pull in email, browsing, reading, social, and local text (and fetched content where we allow it).

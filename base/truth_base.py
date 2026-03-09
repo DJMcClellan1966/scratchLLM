@@ -70,8 +70,28 @@ def load_truth_base(
     return statements
 
 
-def save_truth_base(statements: list[Statement], path: str | Path) -> None:
-    """Save truth base to JSONL."""
+def save_truth_base(
+    statements: list[Statement],
+    path: str | Path,
+    check_consistency: bool = False,
+) -> None:
+    """
+    Save truth base to JSONL.
+    If check_consistency is True, run formal-system consistency on the statement set
+    before writing; if inconsistent, raise ValueError with conflicting pair count and pairs.
+    """
+    if check_consistency and statements:
+        from .godel import encode_statement
+        from .formal_system import is_consistent, conflicting_pairs
+        axioms = {encode_statement(s) for s in statements}
+        if not is_consistent(axioms):
+            pairs = conflicting_pairs(axioms)
+            err = ValueError(
+                f"Truth base inconsistent: {len(pairs)} conflicting pair(s). "
+                "Resolve conflicts or save without check_consistency."
+            )
+            err.conflicting_pairs = pairs  # type: ignore[attr-defined]
+            raise err
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:

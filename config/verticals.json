@@ -1,0 +1,41 @@
+{
+  "general": {
+    "id": "general",
+    "label": "General",
+    "default_truth_base": null,
+    "default_ir": null,
+    "default_max_tier": 2
+  },
+  "medical": {
+    "id": "medical",
+    "label": "Medical",
+    "default_truth_base": "corpus/medical_truth_base.jsonl",
+    "default_ir": "corpus/medical_ir.jsonl",
+    "default_max_tier": 2,
+    "tier_names": {
+      "0": "guideline",
+      "1": "consensus",
+      "2": "practice",
+      "3": "inference",
+      "4": "contested",
+      "5": "opinion",
+      "6": "speculation"
+    }
+  },
+  "legal": {
+    "id": "legal",
+    "label": "Legal",
+    "default_truth_base": "corpus/legal_truth_base.jsonl",
+    "default_ir": "corpus/legal_ir.jsonl",
+    "default_max_tier": 2,
+    "tier_names": {
+      "0": "statute",
+      "1": "precedent",
+      "2": "commentary",
+      "3": "inference",
+      "4": "contested",
+      "5": "opinion",
+      "6": "speculation"
+    }
+  }
+}

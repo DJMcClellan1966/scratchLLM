@@ -57,6 +57,23 @@ python scripts/run_inference.py --checkpoint corpus/checkpoints/ckpt_final.pt --
 
 Omit `--prompt` for interactive mode.
 
+**4. Fast build (no training)** — Answer from the formal layer only (truth base and/or IR). No checkpoint needed; runs on CPU.
+
+```bash
+python scripts/run_fast_response.py --query "What is X?" --truth-base base/truth_base.jsonl
+# or with IR: --ir path/to/pregenerated_ir.jsonl
+```
+
+**GUI:** `python scripts/run_gui.py` — query box, truth-base/IR paths, options (top-k, show IDs/tiers), Run and Check consistency.
+
+**Consistency check:** `python scripts/check_consistency.py --truth-base base/truth_base.jsonl` (or `--ir path/to/ir.jsonl`). Exit 0 if consistent, 1 if not.
+
+Use `--vertical medical` or `--vertical legal` to use domain presets for default paths and max tier (see [docs/VERTICALS.md](docs/VERTICALS.md)).
+
+**Unseen patterns:** `python scripts/analyze_axiom_patterns.py --ir corpus/rag_ir.jsonl --limit 10000 --out corpus/pattern_stats.json` to compute ambiguity per subject, definition-use graph, and definition templates. See [docs/PATTERNS.md](docs/PATTERNS.md).
+
+See [docs/FAST_BUILD.md](docs/FAST_BUILD.md) for details. For richer answers, train a model and use `run_inference` with `--use-base --use-meaning`.
+
 ## Project structure
 
 | Path | Purpose |
@@ -67,4 +84,6 @@ Omit `--prompt` for interactive mode.
 | `model/` | GPT from scratch: causal attention, decoder blocks, LM head |
 | `train/` | Dataset, train config, training loop (CPU-first) |
 | `inference/generate.py` | Load checkpoint + tokenizer, autoregressive generation |
-| `scripts/` | `build_corpus.py`, `train_model.py`, `run_inference.py` |
+| `scripts/` | `build_corpus.py`, `train_model.py`, `run_inference.py`, `run_fast_response.py`, `run_gui.py`, `check_consistency.py`, `analyze_axiom_patterns.py` |
+| `base/respond.py` | Formal-only response (no model): `respond_formal_only` |
+| `docs/FAST_BUILD.md` | Fast-build path: formal language + truth base/IR, local/CPU |

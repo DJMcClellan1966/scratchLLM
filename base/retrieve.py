@@ -53,7 +53,7 @@ def retrieve_truth_base(
     top_k: int = 5,
     max_tier: int = 2,
 ) -> list[str]:
-    """Return top-k statement texts from truth base (tier <= max_tier) by word overlap with query."""
+    """Return top-k statement texts (tier <= max_tier) by word overlap; tie-break by shorter text."""
     statements = load_truth_base(truth_base_path)
     statements = [s for s in statements if s.tier <= max_tier]
     if not statements:
@@ -63,19 +63,29 @@ def retrieve_truth_base(
     for s in statements:
         s_words = _word_set(s.text)
         overlap = len(q_words & s_words) if q_words else 0
-        scored.append((overlap, -s.tier, s.text))
-    scored.sort(key=lambda x: (x[0], x[1]), reverse=True)
-    return [t for _, _, t in scored[:top_k]]
+        simplicity = -len(s.text)
+        scored.append((overlap, -s.tier, simplicity, s.text))
+    scored.sort(key=lambda x: (x[0], x[1], x[2]), reverse=True)
+    return [t for _, _, _, t in scored[:top_k]]
 
 
-def retrieve_truth_base_by_meaning(
+def _subject_for_importance(s: Statement) -> str:
+    """Subject for importance lookups: id, meaning.subj, or empty."""
+    subj = getattr(s, "id", None) or ((getattr(s, "meaning", None) or {}).get("subj") or "")
+    return (subj or "").strip()
+
+
+def retrieve_from_statements(
     query: str,
-    truth_base_path: str | Path,
+    statements: list[Statement],
     top_k: int = 5,
     max_tier: int = 2,
+    importance_map: Optional[dict[str, float]] = None,
 ) -> list[Statement]:
-    """Return top-k Statements (with meaning) by meaning overlap; fallback to word overlap."""
-    statements = load_truth_base(truth_base_path, parse_meaning_if_missing=True)
+    """
+    Return top-k Statements by meaning overlap, word overlap, tier; tie-break by simplicity (shorter text)
+    and optionally importance (e.g. from pattern_stats definition_use_in_degree).
+    """
     statements = [s for s in statements if s.tier <= max_tier]
     if not statements:
         return []
@@ -86,12 +96,26 @@ def retrieve_truth_base_by_meaning(
     for s in statements:
         m_score = _meaning_score(q_meaning, s.meaning) if (q_meaning and s.meaning) else 0
         overlap = len(q_words & _word_set(s.text)) if q_words else 0
-        if m_score > 0:
-            scored.append((m_score, overlap, -s.tier, s))
-        else:
-            scored.append((0, overlap, -s.tier, s))
-    scored.sort(key=lambda x: (x[0], x[1], x[2]), reverse=True)
-    return [s for _, _, _, s in scored[:top_k]]
+        simplicity = -len((getattr(s, "text", "") or ""))  # prefer shorter (Kolmogorov-style tie-break)
+        subj = _subject_for_importance(s)
+        importance = (importance_map or {}).get(subj.lower(), 0.0) if importance_map else 0.0
+        scored.append((m_score, overlap, -s.tier, simplicity, importance, s))
+    scored.sort(key=lambda x: (x[0], x[1], x[2], x[3], x[4]), reverse=True)
+    return [s for _, _, _, _, _, s in scored[:top_k]]
+
+
+def retrieve_truth_base_by_meaning(
+    query: str,
+    truth_base_path: str | Path,
+    top_k: int = 5,
+    max_tier: int = 2,
+    importance_map: Optional[dict[str, float]] = None,
+) -> list[Statement]:
+    """Return top-k Statements (with meaning) by meaning overlap; tie-break by simplicity and optional importance."""
+    statements = load_truth_base(truth_base_path, parse_meaning_if_missing=True)
+    return retrieve_from_statements(
+        query, statements, top_k=top_k, max_tier=max_tier, importance_map=importance_map
+    )
 
 
 def retrieve_corpus(
@@ -133,10 +157,16 @@ def retrieve_for_prompt(
     max_tier_corpus: Optional[int] = 6,
     use_meaning: bool = False,
     resolve: bool = True,
-) -> tuple[list[str], list[str]]:
-    """Return (truth_chunks, corpus_chunks). If use_meaning, retrieve by meaning and optionally resolve conflicts."""
+    return_truth_statements: bool = False,
+) -> tuple[list[str], list[str]] | tuple[list[str], list[str], list[Statement]]:
+    """
+    Return (truth_chunks, corpus_chunks). If use_meaning, retrieve by meaning and optionally resolve conflicts.
+    If return_truth_statements is True, return (truth_chunks, corpus_chunks, truth_statements) where
+    truth_statements are the Statement objects used for truth_chunks (non-empty only when use_meaning=True).
+    """
     truth_chunks: list[str] = []
     corpus_chunks: list[str] = []
+    truth_statements: list[Statement] = []
     if truth_base_path:
         if use_meaning:
             statements = retrieve_truth_base_by_meaning(
@@ -147,8 +177,10 @@ def retrieve_for_prompt(
                 with_meanings = [(s, s.meaning) for s in statements]
                 resolved = resolve_conflicts(with_meanings)
                 truth_chunks = [s.text if hasattr(s, "text") else str(s) for s in resolved]
+                truth_statements = list(resolved)
             else:
                 truth_chunks = [s.text for s in statements]
+                truth_statements = list(statements)
         else:
             truth_chunks = retrieve_truth_base(
                 prompt, truth_base_path, top_k=truth_top_k, max_tier=max_tier_truth
@@ -157,4 +189,6 @@ def retrieve_for_prompt(
         corpus_chunks = retrieve_corpus(
             prompt, corpus_path, top_k=corpus_top_k, max_tier=max_tier_corpus
         )
+    if return_truth_statements:
+        return (truth_chunks, corpus_chunks, truth_statements)
     return (truth_chunks, corpus_chunks)

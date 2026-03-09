@@ -123,23 +123,48 @@ def generate_with_base(
     top_k: Optional[int] = 40,
     truth_top_k: int = 5,
     corpus_top_k: int = 5,
-) -> str:
+    max_tier_truth: int = 2,
+    return_citations: bool = False,
+) -> str | tuple[str, list[int], list]:
     """
     Generate with optional meaning base: retrieve from truth base + corpus, format with
     [FACT]/[CONTEXT]/[PROMPT], then run autoregressive generation. If use_meaning is True,
     retrieval uses the meaning language and conflicts are resolved by tier.
+    If return_citations is True, returns (generated_text, list of Gödel IDs of truth statements used);
+    otherwise returns generated_text only (backward compatible).
     """
     if not _HAS_BASE or not use_base or (not truth_base_path and not corpus_path):
-        return generate(model, tokenizer, prompt, max_new_tokens, temperature, top_k)
-    truth_chunks, corpus_chunks = retrieve_for_prompt(
+        text = generate(model, tokenizer, prompt, max_new_tokens, temperature, top_k)
+        return (text, []) if return_citations else text
+    out = retrieve_for_prompt(
         prompt,
         truth_base_path=truth_base_path,
         corpus_path=corpus_path,
         truth_top_k=truth_top_k,
         corpus_top_k=corpus_top_k,
+        max_tier_truth=max_tier_truth,
         use_meaning=use_meaning,
         resolve=use_meaning,
+        return_truth_statements=return_citations and use_meaning,
     )
+    if return_citations and use_meaning and len(out) == 3:
+        truth_chunks, corpus_chunks, truth_statements = out
+        citation_ids = []
+        try:
+            from base.godel import encode_statement
+            for s in truth_statements:
+                try:
+                    citation_ids.append(encode_statement(s))
+                except (TypeError, ValueError):
+                    pass
+        except ImportError:
+            pass
+        citation_tiers = [getattr(s, "tier", None) for s in truth_statements]
+    else:
+        truth_chunks = out[0]
+        corpus_chunks = out[1]
+        citation_ids = []
+        citation_tiers = []
     formatted = format_context(
         truth_chunks,
         corpus_chunks,
@@ -147,7 +172,7 @@ def generate_with_base(
         tokenizer=tokenizer,
         context_len=model.context_len,
     )
-    return generate(
+    text = generate(
         model,
         tokenizer,
         formatted.context_string,
@@ -155,3 +180,6 @@ def generate_with_base(
         temperature=temperature,
         top_k=top_k,
     )
+    if return_citations:
+        return (text, citation_ids, citation_tiers)
+    return text
