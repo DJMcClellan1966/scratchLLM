@@ -71,7 +71,7 @@ python scripts/create_helper_from_intent.py "I want to junk journal"
 # Creates corpus/user_helpers/<id>/truth_base.jsonl; use that path or the GUI.
 ```
 
-**GUI:** `python scripts/run_gui.py` — **What do you want help with?** (create a helper from your intent) or choose a **Helper** (My helpers or Prebuilt verticals). Query, truth-base/IR paths, Run and Check consistency. After creating a helper, use it with no internet.
+**GUI (Align):** `python scripts/run_gui.py` — **What do you want help with?** (create a helper from your intent) or choose a **Helper** (My helpers or Prebuilt verticals). Query, truth-base/IR paths, Run and Check consistency. After creating a helper, use it with no internet.
 
 **Consistency check:** `python scripts/check_consistency.py --truth-base base/truth_base.jsonl` (or `--ir path/to/ir.jsonl`). Exit 0 if consistent, 1 if not.
 

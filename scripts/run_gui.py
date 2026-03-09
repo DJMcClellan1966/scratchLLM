@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Simple GUI for formal-only Q&A: create helper from intent (primary) or use prebuilt vertical (secondary)."""
+"""
+Intent-first GUI: minimal and adaptive.
+- Welcome: one question, one input, Get started. No technical details.
+- Working: once the user states their need, the UI aligns to it — friendly title and placeholder.
+- Settings: advanced options (paths, consistency, audit) hidden for power users.
+"""
 import sys
 from pathlib import Path
 
@@ -21,256 +26,332 @@ def main() -> None:
         except Exception:
             return []
 
-    def browse_truth_base() -> None:
-        p = filedialog.askopenfilename(
-            title="Select truth base JSONL",
-            filetypes=[("JSONL", "*.jsonl"), ("All", "*")],
-        )
-        if p:
-            truth_base_var.set(p)
-
-    def browse_ir() -> None:
-        p = filedialog.askopenfilename(
-            title="Select IR JSONL",
-            filetypes=[("JSONL", "*.jsonl"), ("All", "*")],
-        )
-        if p:
-            ir_var.set(p)
-
-    def run_query() -> None:
-        query = query_var.get().strip()
-        if not query:
-            messagebox.showinfo("Query", "Enter a query.")
-            return
-        tb = truth_base_var.get().strip() or None
-        ir = ir_var.get().strip() or None
-        if not tb and not ir:
-            messagebox.showwarning("Paths", "Set at least one of Truth base or IR path.")
-            return
-        if tb and not Path(tb).exists():
-            messagebox.showerror("Path", f"Truth base not found: {tb}")
-            return
-        if ir and not Path(ir).exists():
-            messagebox.showerror("Path", f"IR file not found: {ir}")
-            return
+    def get_template_label_and_placeholder(intent: str) -> tuple[str, str]:
+        """Return (friendly_label, placeholder) for intent. Uses templates if available."""
         try:
-            from base import respond_formal_only
-            try:
-                top_k = int(top_k_var.get())
-            except (ValueError, tk.TclError):
-                top_k = 5
-            include_audit = include_audit_var.get()
-            sel = helper_var.get()
-            vertical_id = None
-            if sel in prebuilt_labels and vertical_ids:
-                vertical_id = vertical_ids[prebuilt_labels.index(sel)]
-            result = respond_formal_only(
-                query,
-                truth_base_path=tb or None,
-                ir_path=ir or None,
-                top_k=max(1, min(50, top_k)),
-                max_tier=max(0, min(6, max_tier_var.get())),
-                resolve=not no_resolve_var.get(),
-                include_audit=include_audit,
-                run_consistency_check=include_audit,
-                vertical_id=vertical_id,
-            )
-            text = result[0] or "(no matching statements)"
-            ids = result[1]
-            statements = result[2] if len(result) > 2 else []
-            audit = result[3] if len(result) > 3 else None
-            out_lines = [text]
-            if show_tiers_var.get() and statements:
-                out_lines.append("")
-                for s in statements:
-                    tier = getattr(s, "tier", "")
-                    t = (getattr(s, "text", "") or "")[:200]
-                    out_lines.append(f"[Tier {tier}] {t}" + ("..." if len((getattr(s, "text", "") or "")) > 200 else ""))
-            if show_ids_var.get() and ids:
-                out_lines.append("")
-                out_lines.append("Gödel IDs: " + ", ".join(str(n) for n in ids))
-            if include_audit and audit:
-                out_lines.append("")
-                out_lines.append("Audit: {} citations, consistency: {}".format(
-                    len(ids),
-                    "yes" if audit.get("consistent") is True else ("no" if audit.get("consistent") is False else "not checked"),
-                ))
-                audit_path = ROOT / "last_audit.json"
-                try:
-                    import json
-                    audit_path.write_text(json.dumps(audit, ensure_ascii=False, indent=2), encoding="utf-8")
-                except Exception:
-                    pass
-            response_text.delete("1.0", tk.END)
-            response_text.insert(tk.END, "\n".join(out_lines))
-        except Exception as e:
-            response_text.delete("1.0", tk.END)
-            response_text.insert(tk.END, f"Error: {e}")
-            response_text.see(tk.END)
-
-    def check_consistency() -> None:
-        tb = truth_base_var.get().strip() or None
-        ir = ir_var.get().strip() or None
-        if not tb and not ir:
-            messagebox.showwarning("Paths", "Set at least one of Truth base or IR path.")
-            return
-        if tb and not Path(tb).exists():
-            messagebox.showerror("Path", f"Truth base not found: {tb}")
-            return
-        if ir and not Path(ir).exists():
-            messagebox.showerror("Path", f"IR file not found: {ir}")
-            return
-        try:
-            from base import check_consistency_of_paths
-            consistent, pairs = check_consistency_of_paths(
-                truth_base_path=tb,
-                ir_path=ir,
-            )
-            if consistent:
-                messagebox.showinfo("Consistency", "Consistent: yes.")
-            else:
-                messagebox.showwarning(
-                    "Consistency",
-                    f"Consistent: no.\nConflicting pairs: {len(pairs)}.",
-                )
-        except Exception as e:
-            messagebox.showerror("Consistency", str(e))
+            from base.intent import load_intent_templates, get_template_for_intent
+            templates = load_intent_templates()
+            tid = get_template_for_intent(intent, templates)
+            if tid and tid in templates:
+                t = templates[tid]
+                label = t.get("label", "Align")
+                placeholder = t.get("placeholder", "Ask anything…")
+                return (label, placeholder)
+        except Exception:
+            pass
+        # Fallback: short intent or generic
+        short = (intent.strip()[:40] + "…") if len(intent.strip()) > 40 else intent.strip()
+        return (short or "Align", "Ask anything…")
 
     root = tk.Tk()
-    root.title("scratchLLM – Formal Q&A (language + Gödel)")
-    root.minsize(500, 400)
+    root.title("Align")
+    root.minsize(480, 420)
+    root.geometry("520x480")
 
-    f = ttk.Frame(root, padding=10)
-    f.pack(fill=tk.BOTH, expand=True)
+    # State: current helper = None or dict with truth_base_path, ir_path, intent, display_label, placeholder, is_prebuilt, vertical_id?
+    current_helper: dict | None = None
+    truth_base_var = tk.StringVar()
+    ir_var = tk.StringVar()
+    max_tier_var = tk.IntVar(value=2)
+    top_k_var = tk.IntVar(value=5)
+    include_audit_var = tk.BooleanVar(value=False)
+    vertical_ids: list[str] = []
+    prebuilt_labels: list[str] = []
 
-    # Load verticals (prebuilt) and my helpers
     from base.vertical import load_verticals_config, resolve_vertical
     verticals_config = load_verticals_config()
     vertical_ids = list(verticals_config.keys())
     prebuilt_labels = [verticals_config[v].get("label", v) for v in vertical_ids]
 
-    my_helpers: list[dict] = []  # [{helper_id, truth_base_path, intent}, ...]
-    helper_option_values: list[str] = []  # labels for dropdown: "My: X", "--- Prebuilt ---", "General", ...
+    my_helpers: list[dict] = []
 
-    def build_helper_options() -> list[str]:
-        nonlocal my_helpers
-        my_helpers = refresh_my_helpers()
-        opts = [f"My: {h['helper_id']}" for h in my_helpers]
-        if prebuilt_labels:
-            opts.append("--- Prebuilt ---")
-            opts.extend(prebuilt_labels)
-        return opts if opts else ["(No helpers — create one below)"]
-
-    def on_helper_change(*_args) -> None:
-        sel = helper_var.get()
-        if not sel or sel == "(No helpers — create one below)":
+    def run_query() -> None:
+        q = query_var.get().strip()
+        if not q or q == getattr(query_entry, "placeholder", ""):
             return
-        if sel == "--- Prebuilt ---":
+        tb = truth_base_var.get().strip() or None
+        ir = ir_var.get().strip() or None
+        if not tb and not ir:
+            messagebox.showinfo("Ask", "No helper is active. Create or choose one first.")
             return
-        # My helper
-        for h in my_helpers:
-            if f"My: {h['helper_id']}" == sel:
-                truth_base_var.set(h["truth_base_path"])
-                ir_var.set("")
-                max_tier_var.set(2)
-                return
-        # Prebuilt
-        if sel in prebuilt_labels and vertical_ids:
-            vid = vertical_ids[prebuilt_labels.index(sel)]
-            tb_path, ir_path, mt, _ = resolve_vertical(vid, base_dir=ROOT)
-            truth_base_var.set(str(tb_path) if tb_path else "")
-            ir_var.set(str(ir_path) if ir_path else "")
-            max_tier_var.set(mt)
+        if tb and not Path(tb).exists():
+            messagebox.showerror("Error", "Helper data not found. Try switching or creating a new helper.")
+            return
+        try:
+            from base import respond_formal_only
+            sel = current_helper
+            vertical_id = sel.get("vertical_id") if sel and sel.get("is_prebuilt") else None
+            result = respond_formal_only(
+                q,
+                truth_base_path=tb or None,
+                ir_path=ir or None,
+                top_k=max(1, min(50, top_k_var.get())),
+                max_tier=max(0, min(6, max_tier_var.get())),
+                resolve=True,
+                include_audit=include_audit_var.get(),
+                run_consistency_check=include_audit_var.get(),
+                vertical_id=vertical_id,
+            )
+            text = result[0] or "I don’t have a clear answer for that yet. Try rephrasing or adding more in Align."
+            response_text.delete("1.0", tk.END)
+            response_text.insert(tk.END, text)
+            if include_audit_var.get() and result[3]:
+                audit = result[3]
+                try:
+                    import json
+                    (ROOT / "last_audit.json").write_text(
+                        json.dumps(audit, ensure_ascii=False, indent=2), encoding="utf-8"
+                    )
+                except Exception:
+                    pass
+        except Exception as e:
+            response_text.delete("1.0", tk.END)
+            response_text.insert(tk.END, f"Something went wrong: {e}")
 
-    def create_helper() -> None:
+    def set_helper(h: dict) -> None:
+        nonlocal current_helper
+        current_helper = h
+        truth_base_var.set(h.get("truth_base_path", ""))
+        ir_var.set(h.get("ir_path", ""))
+        max_tier_var.set(h.get("max_tier", 2))
+        header_label.config(text=h.get("display_label", "Align"))
+        ph = h.get("placeholder", "Ask anything…")
+        query_entry.delete(0, tk.END)
+        query_entry.insert(0, "")
+        query_entry.placeholder = ph
+        _set_placeholder(query_entry, ph)
+        root.title(f"Align — {h.get('display_label', 'Helper')}")
+
+    def _set_placeholder(entry: tk.Entry, text: str) -> None:
+        try:
+            entry.placeholder = text
+            if not entry.get().strip():
+                entry.delete(0, tk.END)
+                entry.insert(0, text)
+                try:
+                    entry.config(fg="gray")
+                except tk.TclError:
+                    pass
+        except Exception:
+            pass
+
+    def _clear_placeholder(entry: tk.Entry) -> None:
+        try:
+            if getattr(entry, "placeholder", None) and entry.get().strip() == entry.placeholder:
+                entry.delete(0, tk.END)
+                try:
+                    entry.config(fg="black")
+                except tk.TclError:
+                    pass
+        except Exception:
+            pass
+
+    def _restore_placeholder(entry: tk.Entry) -> None:
+        try:
+            if getattr(entry, "placeholder", None) and not entry.get().strip():
+                entry.delete(0, tk.END)
+                entry.insert(0, entry.placeholder)
+                try:
+                    entry.config(fg="gray")
+                except tk.TclError:
+                    pass
+        except Exception:
+            pass
+
+    def show_working_view() -> None:
+        welcome_frame.pack_forget()
+        working_frame.pack(fill=tk.BOTH, expand=True, padx=16, pady=16)
+
+    def show_welcome_view() -> None:
+        working_frame.pack_forget()
+        welcome_frame.pack(fill=tk.BOTH, expand=True, padx=24, pady=24)
+        root.title("Align")
+
+    def create_and_enter_helper() -> None:
         intent = intent_var.get().strip()
         if not intent:
-            messagebox.showinfo("Create helper", "Enter what you want help with (e.g. 'I want to junk journal').")
+            messagebox.showinfo("Get started", "Type what you want help with — for example, \"I want to junk journal\" or \"I’m planning a hike\".")
             return
         try:
             from base.intent import create_helper_from_intent
-            helper_id, truth_base_path, count = create_helper_from_intent(
-                intent, out_dir=USER_HELPERS_DIR
-            )
-            helper_option_values[:] = build_helper_options()
-            helper_combo["values"] = helper_option_values
-            helper_var.set(f"My: {helper_id}")
-            truth_base_var.set(str(truth_base_path))
-            ir_var.set("")
-            max_tier_var.set(2)
-            messagebox.showinfo("Create helper", f"Created helper '{helper_id}' with {count} statements.")
+            helper_id, tb_path, count = create_helper_from_intent(intent, out_dir=USER_HELPERS_DIR)
+            label, placeholder = get_template_label_and_placeholder(intent)
+            set_helper({
+                "truth_base_path": str(tb_path),
+                "ir_path": "",
+                "intent": intent,
+                "display_label": label,
+                "placeholder": placeholder,
+                "is_prebuilt": False,
+                "helper_id": helper_id,
+            })
+            show_working_view()
+            messagebox.showinfo("Ready", f"Align is set up with {count} ideas. Ask anything below.")
         except ValueError as e:
-            messagebox.showerror("Create helper", str(e))
+            messagebox.showerror("Can’t create helper", str(e))
 
-    helper_option_values[:] = build_helper_options()
-    default_helper = ""
-    if my_helpers:
-        default_helper = f"My: {my_helpers[0]['helper_id']}"
-    elif prebuilt_labels:
-        default_helper = prebuilt_labels[0]
-    elif helper_option_values:
-        default_helper = helper_option_values[0]
+    def use_prebuilt() -> None:
+        sel = prebuilt_combo.get()
+        if not sel or sel not in prebuilt_labels:
+            return
+        vid = vertical_ids[prebuilt_labels.index(sel)]
+        tb_path, ir_path, mt, _ = resolve_vertical(vid, base_dir=ROOT)
+        label = verticals_config.get(vid, {}).get("label", sel)
+        set_helper({
+            "truth_base_path": str(tb_path) if tb_path else "",
+            "ir_path": str(ir_path) if ir_path else "",
+            "intent": "",
+            "display_label": label,
+            "placeholder": "Ask anything…",
+            "is_prebuilt": True,
+            "vertical_id": vid,
+        })
+        show_working_view()
 
-    ttk.Label(f, text="What do you want help with?").grid(row=0, column=0, sticky=tk.W)
+    def open_my_helper() -> None:
+        sel = my_helpers_combo.get()
+        if not sel:
+            return
+        helpers_now = refresh_my_helpers()
+        for h in helpers_now:
+            if f"My: {h['helper_id']}" == sel:
+                intent = h.get("intent", "")
+                label, placeholder = get_template_label_and_placeholder(intent)
+                set_helper({
+                    "truth_base_path": h["truth_base_path"],
+                    "ir_path": "",
+                    "intent": intent,
+                    "display_label": label,
+                    "placeholder": placeholder,
+                    "is_prebuilt": False,
+                    "helper_id": h["helper_id"],
+                })
+                show_working_view()
+                return
+
+    def switch_helper_click() -> None:
+        nonlocal my_helpers
+        my_helpers = refresh_my_helpers()
+        my_helpers_combo["values"] = [f"My: {x['helper_id']}" for x in my_helpers]
+        if my_helpers:
+            my_helpers_combo.set(f"My: {my_helpers[0]['helper_id']}")
+            open_btn.config(state=tk.NORMAL)
+        else:
+            my_helpers_combo.set("")
+            open_btn.config(state=tk.DISABLED)
+        show_welcome_view()
+
+    def open_settings() -> None:
+        win = tk.Toplevel(root)
+        win.title("Settings")
+        win.geometry("420x280")
+        ttk.Label(win, text="Paths and options (for advanced use)").pack(pady=(10, 6))
+        pf = ttk.Frame(win, padding=10)
+        pf.pack(fill=tk.BOTH, expand=True)
+        ttk.Label(pf, text="Truth base:").grid(row=0, column=0, sticky=tk.W, pady=2)
+        ttk.Entry(pf, textvariable=truth_base_var, width=44).grid(row=0, column=1, sticky=tk.EW, padx=4, pady=2)
+        ttk.Button(pf, text="Browse…", command=_browse_tb).grid(row=0, column=2, pady=2)
+        ttk.Label(pf, text="IR JSONL:").grid(row=1, column=0, sticky=tk.W, pady=2)
+        ttk.Entry(pf, textvariable=ir_var, width=44).grid(row=1, column=1, sticky=tk.EW, padx=4, pady=2)
+        ttk.Label(pf, text="Top-k:").grid(row=2, column=0, sticky=tk.W, pady=2)
+        tk.Spinbox(pf, from_=1, to=50, width=6, textvariable=top_k_var).grid(row=2, column=1, sticky=tk.W, padx=4, pady=2)
+        ttk.Checkbutton(pf, text="Include audit (save to last_audit.json)", variable=include_audit_var).grid(row=3, column=0, columnspan=2, sticky=tk.W, pady=4)
+        def do_consistency() -> None:
+            tb = truth_base_var.get().strip() or None
+            ir = ir_var.get().strip() or None
+            if not tb and not ir:
+                messagebox.showwarning("Settings", "Set at least one path.")
+                return
+            try:
+                from base import check_consistency_of_paths
+                ok, pairs = check_consistency_of_paths(truth_base_path=tb, ir_path=ir)
+                messagebox.showinfo("Consistency", "Consistent: yes." if ok else f"Consistent: no. {len(pairs)} conflict(s).")
+            except Exception as e:
+                messagebox.showerror("Consistency", str(e))
+        ttk.Button(pf, text="Check consistency", command=do_consistency).grid(row=4, column=0, columnspan=2, sticky=tk.W, pady=4)
+        pf.columnconfigure(1, weight=1)
+        ttk.Button(win, text="Close", command=win.destroy).pack(pady=10)
+
+    # ----- Welcome frame -----
+    welcome_frame = ttk.Frame(root)
+    ttk.Label(welcome_frame, text="What do you want help with?", font=("Segoe UI", 12, "bold")).pack(anchor=tk.W, pady=(0, 8))
+    ttk.Label(welcome_frame, text="Describe it in a sentence. Align will build a helper from that.", foreground="gray").pack(anchor=tk.W, pady=(0, 12))
     intent_var = tk.StringVar()
-    ttk.Entry(f, textvariable=intent_var, width=50).grid(row=0, column=1, sticky=tk.EW, padx=(5, 5), pady=2)
-    ttk.Button(f, text="Create helper", command=create_helper).grid(row=0, column=2, pady=2)
+    intent_entry = ttk.Entry(welcome_frame, textvariable=intent_var, width=52)
+    intent_entry.pack(fill=tk.X, pady=(0, 12))
+    ttk.Button(welcome_frame, text="Get started", command=create_and_enter_helper).pack(anchor=tk.W, pady=(0, 24))
 
-    ttk.Label(f, text="Query:").grid(row=1, column=0, sticky=tk.W)
+    ttk.Separator(welcome_frame, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=12)
+    ttk.Label(welcome_frame, text="Or explore a sample", font=("Segoe UI", 10)).pack(anchor=tk.W, pady=(0, 6))
+    prebuilt_combo = ttk.Combobox(welcome_frame, values=prebuilt_labels, state="readonly", width=36)
+    prebuilt_combo.pack(side=tk.LEFT, pady=(0, 6))
+    if prebuilt_labels:
+        prebuilt_combo.set(prebuilt_labels[0])
+    ttk.Button(welcome_frame, text="Use this", command=use_prebuilt).pack(side=tk.LEFT, padx=8, pady=(0, 6))
+
+    ttk.Label(welcome_frame, text="Or open an existing helper", font=("Segoe UI", 10)).pack(anchor=tk.W, pady=(16, 6))
+    my_helpers_for_welcome = refresh_my_helpers()
+    my_helpers_combo = ttk.Combobox(welcome_frame, values=[f"My: {x['helper_id']}" for x in my_helpers_for_welcome], state="readonly", width=36)
+    my_helpers_combo.pack(side=tk.LEFT, pady=(0, 6))
+    if my_helpers_for_welcome:
+        my_helpers_combo.set(f"My: {my_helpers_for_welcome[0]['helper_id']}")
+    open_btn = ttk.Button(welcome_frame, text="Open", command=open_my_helper)
+    open_btn.pack(side=tk.LEFT, padx=8, pady=(0, 6))
+    open_btn.config(state=tk.NORMAL if my_helpers_for_welcome else tk.DISABLED)
+
+    # ----- Working frame -----
+    working_frame = ttk.Frame(root)
+    header_label = ttk.Label(working_frame, text="Align", font=("Segoe UI", 12, "bold"))
+    header_label.pack(anchor=tk.W, pady=(0, 8))
+
     query_var = tk.StringVar()
-    query_entry = ttk.Entry(f, textvariable=query_var, width=50)
-    query_entry.grid(row=1, column=1, columnspan=2, sticky=tk.EW, padx=(5, 0), pady=2)
+    query_entry = ttk.Entry(working_frame, textvariable=query_var, width=52)
+    query_entry.pack(fill=tk.X, pady=(0, 6))
+    query_entry.placeholder = "Ask anything…"
+    query_entry.bind("<FocusIn>", lambda e: _clear_placeholder(query_entry))
+    query_entry.bind("<FocusOut>", lambda e: _restore_placeholder(query_entry))
+    query_entry.bind("<Return>", lambda e: run_query())
 
-    ttk.Label(f, text="Helper:").grid(row=2, column=0, sticky=tk.W)
-    helper_var = tk.StringVar(value=default_helper)
-    helper_combo = ttk.Combobox(f, textvariable=helper_var, values=helper_option_values, state="readonly", width=42)
-    helper_combo.grid(row=2, column=1, columnspan=2, sticky=tk.EW, padx=(5, 0), pady=2)
-    helper_var.trace_add("write", on_helper_change)
-    if default_helper and default_helper != "(No helpers — create one below)":
-        on_helper_change()
+    ttk.Button(working_frame, text="Ask", command=run_query).pack(anchor=tk.W, pady=(0, 12))
 
-    ttk.Label(f, text="Truth base:").grid(row=3, column=0, sticky=tk.W)
-    truth_base_var = tk.StringVar()
-    ttk.Entry(f, textvariable=truth_base_var, width=45).grid(row=3, column=1, sticky=tk.EW, padx=(5, 5), pady=2)
-    ttk.Button(f, text="Browse…", command=browse_truth_base).grid(row=3, column=2, pady=2)
+    ttk.Label(working_frame, text="Answer").pack(anchor=tk.W, pady=(8, 2))
+    response_text = scrolledtext.ScrolledText(working_frame, wrap=tk.WORD, width=58, height=14, font=("Segoe UI", 10))
+    response_text.pack(fill=tk.BOTH, expand=True, pady=(0, 12))
 
-    ttk.Label(f, text="IR JSONL:").grid(row=4, column=0, sticky=tk.W)
-    ir_var = tk.StringVar()
-    ttk.Entry(f, textvariable=ir_var, width=45).grid(row=4, column=1, sticky=tk.EW, padx=(5, 5), pady=2)
-    ttk.Button(f, text="Browse…", command=browse_ir).grid(row=4, column=2, pady=2)
+    foot = ttk.Frame(working_frame)
+    foot.pack(fill=tk.X)
+    ttk.Button(foot, text="Switch helper", command=switch_helper_click).pack(side=tk.LEFT, padx=(0, 8))
+    ttk.Button(foot, text="Settings", command=open_settings).pack(side=tk.LEFT)
 
-    max_tier_var = tk.IntVar(value=2)
+    # Fix Settings browse: use a proper lambda that stores result
+    def _browse_tb() -> None:
+        p = filedialog.askopenfilename(title="Truth base", filetypes=[("JSONL", "*.jsonl"), ("All", "*")])
+        if p:
+            truth_base_var.set(p)
 
-    opts = ttk.Frame(f)
-    opts.grid(row=5, column=0, columnspan=3, sticky=tk.W, pady=6)
-    top_k_var = tk.IntVar(value=5)
-    ttk.Label(opts, text="Top-k:").pack(side=tk.LEFT)
-    tk.Spinbox(opts, from_=1, to=50, width=4, textvariable=top_k_var).pack(side=tk.LEFT, padx=(5, 15))
-    ttk.Label(opts, text="Max tier:").pack(side=tk.LEFT, padx=(15, 0))
-    tk.Spinbox(opts, from_=0, to=6, width=2, textvariable=max_tier_var).pack(side=tk.LEFT, padx=(5, 15))
-    show_ids_var = tk.BooleanVar(value=False)
-    ttk.Checkbutton(opts, text="Show Gödel IDs", variable=show_ids_var).pack(side=tk.LEFT, padx=5)
-    show_tiers_var = tk.BooleanVar(value=False)
-    ttk.Checkbutton(opts, text="Show tiers", variable=show_tiers_var).pack(side=tk.LEFT, padx=5)
-    no_resolve_var = tk.BooleanVar(value=False)
-    ttk.Checkbutton(opts, text="Skip conflict resolution", variable=no_resolve_var).pack(side=tk.LEFT, padx=5)
-    include_audit_var = tk.BooleanVar(value=False)
-    ttk.Checkbutton(opts, text="Include audit (citations + consistency)", variable=include_audit_var).pack(side=tk.LEFT, padx=5)
+    # Startup: if we have any helper, go straight to working view
+    my_helpers = refresh_my_helpers()
+    if my_helpers:
+        h = my_helpers[0]
+        intent = h.get("intent", "")
+        label, placeholder = get_template_label_and_placeholder(intent)
+        set_helper({
+            "truth_base_path": h["truth_base_path"],
+            "ir_path": "",
+            "intent": intent,
+            "display_label": label,
+            "placeholder": placeholder,
+            "is_prebuilt": False,
+            "helper_id": h["helper_id"],
+        })
+        show_working_view()
+    elif prebuilt_labels:
+        prebuilt_combo.set(prebuilt_labels[0])
+        use_prebuilt()
+    else:
+        welcome_frame.pack(fill=tk.BOTH, expand=True, padx=24, pady=24)
 
-    btn_frame = ttk.Frame(f)
-    btn_frame.grid(row=6, column=0, columnspan=3, pady=6)
-    ttk.Button(btn_frame, text="Run", command=run_query).pack(side=tk.LEFT, padx=2)
-    ttk.Button(btn_frame, text="Check consistency", command=check_consistency).pack(side=tk.LEFT, padx=2)
-
-    ttk.Label(f, text="Response:").grid(row=7, column=0, sticky=tk.NW, pady=(10, 2))
-    response_text = scrolledtext.ScrolledText(f, wrap=tk.WORD, width=60, height=15)
-    response_text.grid(row=8, column=0, columnspan=3, sticky=tk.NSEW, padx=(5, 0), pady=2)
-
-    f.columnconfigure(1, weight=1)
-    root.columnconfigure(0, weight=1)
-    root.rowconfigure(0, weight=1)
-
-    query_entry.focus()
+    intent_entry.focus()
     root.mainloop()
 
 

@@ -2,6 +2,7 @@
   "journaling": {
     "id": "journaling",
     "label": "Journaling & ideas",
+    "placeholder": "Ask about prompts, structure, or ideas…",
     "keywords": ["journal", "journaling", "junk journal", "junk journaling", "diary", "ideas", "organize ideas", "brainstorm", "freewrite", "morning pages"],
     "statements": [
       {"text": "Journaling is writing for yourself: capture thoughts, ideas, and reflections without judgment.", "tier": 1, "source": "curated", "category": "journaling"},
@@ -19,6 +20,7 @@
   "hiking": {
     "id": "hiking",
     "label": "Hiking & outdoors",
+    "placeholder": "Ask about gear, trails, or safety…",
     "keywords": ["hike", "hiking", "trail", "outdoors", "backpack", "day hike", "camping", "trails"],
     "statements": [
       {"text": "Before a hike: check weather, tell someone your route and return time, and bring water and a first-aid kit.", "tier": 0, "source": "curated", "category": "hiking"},
@@ -34,6 +36,7 @@
   "general": {
     "id": "general",
     "label": "General helper",
+    "placeholder": "Ask anything…",
     "keywords": [],
     "statements": [
       {"text": "Set a clear goal for what you want to achieve; write it down so you can refer back.", "tier": 2, "source": "curated", "category": "general"},
