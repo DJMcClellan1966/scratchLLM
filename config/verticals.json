@@ -37,5 +37,21 @@
       "5": "opinion",
       "6": "speculation"
     }
+  },
+  "compliance": {
+    "id": "compliance",
+    "label": "Compliance",
+    "default_truth_base": "corpus/compliance_truth_base.jsonl",
+    "default_ir": "corpus/compliance_ir.jsonl",
+    "default_max_tier": 2,
+    "tier_names": {
+      "0": "policy",
+      "1": "procedure",
+      "2": "guidance",
+      "3": "inference",
+      "4": "contested",
+      "5": "opinion",
+      "6": "speculation"
+    }
   }
 }

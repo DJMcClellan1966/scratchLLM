@@ -50,6 +50,7 @@ def main() -> None:
                 top_k = int(top_k_var.get())
             except (ValueError, tk.TclError):
                 top_k = 5
+            include_audit = include_audit_var.get()
             result = respond_formal_only(
                 query,
                 truth_base_path=tb or None,
@@ -57,10 +58,14 @@ def main() -> None:
                 top_k=max(1, min(50, top_k)),
                 max_tier=max(0, min(6, max_tier_var.get())),
                 resolve=not no_resolve_var.get(),
+                include_audit=include_audit,
+                run_consistency_check=include_audit,
+                vertical_id=vertical_ids[vertical_labels.index(vertical_var.get())] if vertical_var.get() in vertical_labels and vertical_ids else None,
             )
             text = result[0] or "(no matching statements)"
             ids = result[1]
             statements = result[2] if len(result) > 2 else []
+            audit = result[3] if len(result) > 3 else None
             out_lines = [text]
             if show_tiers_var.get() and statements:
                 out_lines.append("")
@@ -71,6 +76,18 @@ def main() -> None:
             if show_ids_var.get() and ids:
                 out_lines.append("")
                 out_lines.append("Gödel IDs: " + ", ".join(str(n) for n in ids))
+            if include_audit and audit:
+                out_lines.append("")
+                out_lines.append("Audit: {} citations, consistency: {}".format(
+                    len(ids),
+                    "yes" if audit.get("consistent") is True else ("no" if audit.get("consistent") is False else "not checked"),
+                ))
+                audit_path = ROOT / "last_audit.json"
+                try:
+                    import json
+                    audit_path.write_text(json.dumps(audit, ensure_ascii=False, indent=2), encoding="utf-8")
+                except Exception:
+                    pass
             response_text.delete("1.0", tk.END)
             response_text.insert(tk.END, "\n".join(out_lines))
         except Exception as e:
@@ -169,6 +186,8 @@ def main() -> None:
     ttk.Checkbutton(opts, text="Show tiers", variable=show_tiers_var).pack(side=tk.LEFT, padx=5)
     no_resolve_var = tk.BooleanVar(value=False)
     ttk.Checkbutton(opts, text="Skip conflict resolution", variable=no_resolve_var).pack(side=tk.LEFT, padx=5)
+    include_audit_var = tk.BooleanVar(value=False)
+    ttk.Checkbutton(opts, text="Include audit (citations + consistency)", variable=include_audit_var).pack(side=tk.LEFT, padx=5)
 
     btn_frame = ttk.Frame(f)
     btn_frame.grid(row=5, column=0, columnspan=3, pady=6)

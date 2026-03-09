@@ -41,12 +41,21 @@ python scripts/run_fast_response.py --query "What is X?" --truth-base base/truth
 - `--check-consistency` — Warn if truth base/IR is inconsistent before responding.
 - `--limit` — Use only first N lines of IR (for consistency check on large files).
 - `--importance` — Path to pattern_stats.json (or directory containing definition_use_in_degree.json) from `analyze_axiom_patterns.py`; used as a tie-breaker so terms that appear in many definitions rank slightly higher when scores tie.
+- `--format json` — Output a single JSON object with `response`, `citation_ids`, `tiers`, and `audit` (for integration). Use with `--output file.json` to write to a file.
+- `--audit` — Include audit blob: print "Audit: N citations, consistency: yes/no" after the response; with `--format json` the full audit is in the JSON.
+- `--output` — When `--format json`, write JSON to this file instead of stdout.
 
 No checkpoint, no tokenizer: runs on CPU only.
+
+**Audit blob:** For compliance and integration, use `--audit` or `--format json`. The audit records query, response, citation IDs, tiers, and optional KB consistency result. See [docs/AUDIT.md](AUDIT.md).
+
+**Integration:** Use `--format json` for CLI integration (see [docs/API.md](API.md)). For a local POST /query endpoint, run `python scripts/serve_api.py --port 8050` (binds to 127.0.0.1). See [docs/API.md](API.md).
 
 **GUI:** Run `python scripts/run_gui.py` for a simple window: query, truth-base/IR paths, top-k, Show IDs/tiers, Skip conflict resolution, Run and Check consistency.
 
 **Consistency:** Run `python scripts/check_consistency.py --truth-base path/to/truth_base.jsonl` (and/or `--ir path/to/ir.jsonl`). Exit 0 if consistent, 1 if not. Use `--limit N` for large IR files.
+
+**Compliance report:** Run `python scripts/generate_compliance_report.py --vertical medical` (or `--truth-base` / `--ir`) to produce a report with KB consistency, axiom count, and tier breakdown. Use `--format text` for a short summary or `--format json` (default) for machine-readable output; `--output path.json` writes to a file. Suitable for auditors.
 
 **Import rag_definitions.json:** To use a large keyword/definition JSON (e.g. desktop dictionary `rag_definitions.json`), run `python scripts/import_rag_definitions.py --input path/to/rag_definitions.json --output corpus/rag_ir.jsonl --limit 50000`, then use `--ir corpus/rag_ir.jsonl` (and `--limit` for consistency checks on big files).
 

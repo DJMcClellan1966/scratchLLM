@@ -68,7 +68,11 @@ python scripts/run_fast_response.py --query "What is X?" --truth-base base/truth
 
 **Consistency check:** `python scripts/check_consistency.py --truth-base base/truth_base.jsonl` (or `--ir path/to/ir.jsonl`). Exit 0 if consistent, 1 if not.
 
-Use `--vertical medical` or `--vertical legal` to use domain presets for default paths and max tier (see [docs/VERTICALS.md](docs/VERTICALS.md)).
+Use `--vertical medical`, `--vertical legal`, or `--vertical compliance` for domain presets (see [docs/VERTICALS.md](docs/VERTICALS.md)). **Hero verticals** (medical, legal, compliance): [docs/HERO_VERTICALS.md](docs/HERO_VERTICALS.md).
+
+**Compliance report:** `python scripts/generate_compliance_report.py --vertical medical` (or `--truth-base`/`--ir`) — consistency, axiom count, tier breakdown for auditors. See [docs/FAST_BUILD.md](docs/FAST_BUILD.md).
+
+**Integration:** Use `--format json` with `run_fast_response` for machine-readable output, or run `python scripts/serve_api.py --port 8050` for a local POST /query API. See [docs/API.md](docs/API.md).
 
 **Unseen patterns:** `python scripts/analyze_axiom_patterns.py --ir corpus/rag_ir.jsonl --limit 10000 --out corpus/pattern_stats.json` to compute ambiguity per subject, definition-use graph, and definition templates. See [docs/PATTERNS.md](docs/PATTERNS.md).
 

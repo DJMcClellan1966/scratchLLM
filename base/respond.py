@@ -4,7 +4,7 @@ and optional Gödel IDs. No model or checkpoint required; CPU-only, local.
 """
 import json
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from .truth_base import Statement, load_truth_base
 from .language import resolve_conflicts
@@ -21,12 +21,17 @@ def respond_formal_only(
     max_tier: int = 2,
     resolve: bool = True,
     importance_path: Optional[str | Path] = None,
-) -> tuple[str, list[int], list[Statement]]:
+    include_audit: bool = False,
+    run_consistency_check: bool = False,
+    vertical_id: Optional[str] = None,
+    ir_limit: Optional[int] = None,
+) -> tuple[str, list[int], list[Statement], Optional[dict[str, Any]]]:
     """
     Answer using only the formal layer (truth base and/or IR). No model load.
     If importance_path points to a JSON with key definition_use_in_degree (e.g. from
     analyze_axiom_patterns), use it as a tie-breaker for retrieval (higher in-degree = more central).
-    Returns (response_text, list of Gödel numbers of statements used, resolved statements for tier display).
+    Returns (response_text, list of Gödel numbers of statements used, resolved statements for tier display,
+    audit dict or None). When include_audit=True, the 4th element is a JSON-serializable audit blob.
     """
     statements: list[Statement] = []
     if truth_base_path:
@@ -39,7 +44,7 @@ def respond_formal_only(
             statements.extend(load_ir_jsonl(path))
 
     if not statements:
-        return ("", [], [])
+        return ("", [], [], None if not include_audit else _audit_none(query, vertical_id))
 
     importance_map: Optional[dict[str, float]] = None
     if importance_path:
@@ -60,7 +65,7 @@ def respond_formal_only(
         query, statements, top_k=top_k, max_tier=max_tier, importance_map=importance_map
     )
     if not retrieved:
-        return ("", [], [])
+        return ("", [], [], None if not include_audit else _audit_none(query, vertical_id))
 
     if resolve:
         with_meanings = [(s, getattr(s, "meaning", None)) for s in retrieved]
@@ -79,4 +84,41 @@ def respond_formal_only(
         except (TypeError, ValueError):
             pass
 
-    return (response_text, used_godel_ids, resolved)
+    tiers_list = [getattr(s, "tier", None) for s in resolved]
+    audit: Optional[dict[str, Any]] = None
+    if include_audit:
+        consistent: Optional[bool] = None
+        conflicting_pairs_count: Optional[int] = None
+        if run_consistency_check and (truth_base_path or ir_path):
+            from .formal_system import check_consistency_of_paths
+            consistent, pairs = check_consistency_of_paths(
+                truth_base_path=truth_base_path,
+                ir_path=ir_path,
+                ir_limit=ir_limit,
+            )
+            conflicting_pairs_count = len(pairs)
+        audit = {
+            "query": query,
+            "response_text": response_text,
+            "citation_ids": list(used_godel_ids),
+            "tiers": tiers_list,
+            "consistency_checked": run_consistency_check and bool(truth_base_path or ir_path),
+            "consistent": consistent,
+            "conflicting_pairs_count": conflicting_pairs_count,
+            "vertical_id": vertical_id,
+        }
+    return (response_text, used_godel_ids, resolved, audit)
+
+
+def _audit_none(query: str, vertical_id: Optional[str] = None) -> dict[str, Any]:
+    """Build a minimal audit when there are no statements or no retrieved results."""
+    return {
+        "query": query,
+        "response_text": "",
+        "citation_ids": [],
+        "tiers": [],
+        "consistency_checked": False,
+        "consistent": None,
+        "conflicting_pairs_count": None,
+        "vertical_id": vertical_id,
+    }

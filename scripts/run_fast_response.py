@@ -34,6 +34,9 @@ def main() -> None:
     ap.add_argument("--limit", type=int, default=None, help="Use only first N lines of IR (for consistency check on large files)")
     ap.add_argument("--importance", type=Path, default=None, help="Path to pattern_stats.json (or dir with definition_use_in_degree) for tie-break ranking")
     ap.add_argument("--vertical", type=str, default=None, help="Vertical preset (e.g. general, medical, legal); uses default paths and max_tier from config")
+    ap.add_argument("--format", choices=["text", "json"], default="text", help="Output format: text or json (for integration)")
+    ap.add_argument("--audit", action="store_true", help="Include audit blob (citations, tiers, consistency); use with --format json or print summary")
+    ap.add_argument("--output", type=Path, default=None, help="Write JSON output to file (when --format json)")
     args = ap.parse_args()
 
     truth_base_path = args.truth_base
@@ -65,8 +68,10 @@ def main() -> None:
         sys.exit(1)
 
     from base import respond_formal_only, check_consistency_of_paths
+    import json as _json
 
-    if args.check_consistency:
+    use_audit = args.audit or args.format == "json"
+    if args.check_consistency and not use_audit:
         consistent, pairs = check_consistency_of_paths(
             truth_base_path=truth_base_path,
             ir_path=ir_path,
@@ -83,10 +88,29 @@ def main() -> None:
         max_tier=max_tier,
         resolve=not args.no_resolve,
         importance_path=args.importance,
+        include_audit=use_audit,
+        run_consistency_check=use_audit or args.check_consistency,
+        vertical_id=args.vertical,
+        ir_limit=args.limit,
     )
     response_text = result[0]
     used_godel_ids = result[1]
     resolved_statements = result[2] if len(result) > 2 else []
+    audit = result[3] if len(result) > 3 else None
+
+    if args.format == "json":
+        out = {
+            "response": response_text or "(no matching statements)",
+            "citation_ids": used_godel_ids,
+            "tiers": [getattr(s, "tier", None) for s in resolved_statements],
+            "audit": audit,
+        }
+        j = _json.dumps(out, ensure_ascii=False, indent=2 if args.output else None)
+        if args.output:
+            args.output.write_text(j, encoding="utf-8")
+        else:
+            _safe_print(j)
+        return
 
     _safe_print(response_text or "(no matching statements)")
     if args.show_tiers and resolved_statements:
@@ -98,6 +122,12 @@ def main() -> None:
     if args.show_ids and used_godel_ids:
         _safe_print("")
         _safe_print("Gödel IDs: " + ", ".join(str(n) for n in used_godel_ids))
+    if args.audit and audit:
+        _safe_print("")
+        _safe_print("Audit: {} citations, consistency: {}".format(
+            len(used_godel_ids),
+            "yes" if audit.get("consistent") is True else ("no" if audit.get("consistent") is False else "not checked"),
+        ))
 
 
 if __name__ == "__main__":
