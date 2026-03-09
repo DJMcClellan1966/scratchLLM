@@ -35,7 +35,7 @@ A minimal **formal system** is defined over the Gödel numbering of scratchLLM o
    axioms = load_axioms_from_ir("path/to/pregenerated_ir.jsonl")
    print(is_consistent(axioms))
    ```
-   Or run the script: `python scripts/run_godel_on_ir.py path/to/pregenerated_ir.jsonl`. Each IR record is converted to a Statement (meaning from the first relation: `is_a` → BE, else → PRED); then the same Gödel/consistency machinery applies.
+   Or run the script: `python scripts/run_godel_on_ir.py path/to/pregenerated_ir.jsonl`. For a quick demo on a large IR file use `--limit 100` (e.g. `python scripts/run_godel_on_ir.py path/to/ir.jsonl --limit 100`). Each IR record is converted to a Statement (meaning from the first relation: `is_a` → BE, else → PRED); then the same Gödel/consistency machinery applies.
 
 5. **Check consistency of paths** (truth base and/or IR combined):
    ```python

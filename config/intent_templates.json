@@ -1,0 +1,44 @@
+{
+  "journaling": {
+    "id": "journaling",
+    "label": "Journaling & ideas",
+    "keywords": ["journal", "journaling", "junk journal", "junk journaling", "diary", "ideas", "organize ideas", "brainstorm", "freewrite", "morning pages"],
+    "statements": [
+      {"text": "Journaling is writing for yourself: capture thoughts, ideas, and reflections without judgment.", "tier": 1, "source": "curated", "category": "journaling"},
+      {"text": "Junk journaling combines writing with mixed media: use scraps, stickers, and collage to organize ideas and memories.", "tier": 1, "source": "curated", "category": "journaling"},
+      {"text": "Freewriting means writing continuously for a set time without editing; it helps surface ideas.", "tier": 1, "source": "curated", "category": "journaling"},
+      {"text": "Morning pages: write three pages by hand each morning to clear your head and uncover what matters.", "tier": 1, "source": "curated", "category": "journaling"},
+      {"text": "Use prompts to get started: What am I avoiding? What went well today? What do I want to remember?", "tier": 2, "source": "curated", "category": "journaling"},
+      {"text": "Organize ideas by theme: give each project or topic a section or tag so you can find it later.", "tier": 2, "source": "curated", "category": "journaling"},
+      {"text": "Bullet journaling uses rapid logging: short bullets, signifiers, and collections to track tasks and thoughts.", "tier": 1, "source": "curated", "category": "journaling"},
+      {"text": "Reflection prompts: What did I learn? What would I do differently? What am I grateful for?", "tier": 2, "source": "curated", "category": "journaling"},
+      {"text": "Your journal is private; write for yourself first. Consistency matters more than length.", "tier": 0, "source": "curated", "category": "journaling"},
+      {"text": "Capture ideas as they come: keep a running list or voice note, then expand in your journal later.", "tier": 2, "source": "curated", "category": "journaling"}
+    ]
+  },
+  "hiking": {
+    "id": "hiking",
+    "label": "Hiking & outdoors",
+    "keywords": ["hike", "hiking", "trail", "outdoors", "backpack", "day hike", "camping", "trails"],
+    "statements": [
+      {"text": "Before a hike: check weather, tell someone your route and return time, and bring water and a first-aid kit.", "tier": 0, "source": "curated", "category": "hiking"},
+      {"text": "Leave No Trace: pack out trash, stay on the trail, and minimize impact on plants and wildlife.", "tier": 0, "source": "curated", "category": "hiking"},
+      {"text": "Day hike essentials: water, snacks, map or GPS, sun protection, extra layer, and a headlamp or light.", "tier": 1, "source": "curated", "category": "hiking"},
+      {"text": "Trail difficulty is often rated by distance, elevation gain, and terrain; match the trail to your fitness.", "tier": 1, "source": "curated", "category": "hiking"},
+      {"text": "Start early to avoid heat and afternoon storms; turn back if conditions worsen.", "tier": 1, "source": "curated", "category": "hiking"},
+      {"text": "Break in new boots before a long hike to prevent blisters; bring blister treatment just in case.", "tier": 2, "source": "curated", "category": "hiking"},
+      {"text": "Hydration: drink before you're thirsty; electrolytes help on long or hot hikes.", "tier": 1, "source": "curated", "category": "hiking"},
+      {"text": "If you get lost: stop, stay put if possible, use whistle or signal; three of anything is a distress signal.", "tier": 0, "source": "curated", "category": "hiking"}
+    ]
+  },
+  "general": {
+    "id": "general",
+    "label": "General helper",
+    "keywords": [],
+    "statements": [
+      {"text": "Set a clear goal for what you want to achieve; write it down so you can refer back.", "tier": 2, "source": "curated", "category": "general"},
+      {"text": "Break large tasks into smaller steps; tackle one step at a time.", "tier": 2, "source": "curated", "category": "general"},
+      {"text": "Review and refine your goals periodically; adjust as you learn what works for you.", "tier": 2, "source": "curated", "category": "general"}
+    ]
+  }
+}

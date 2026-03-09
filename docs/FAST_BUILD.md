@@ -51,7 +51,9 @@ No checkpoint, no tokenizer: runs on CPU only.
 
 **Integration:** Use `--format json` for CLI integration (see [docs/API.md](API.md)). For a local POST /query endpoint, run `python scripts/serve_api.py --port 8050` (binds to 127.0.0.1). See [docs/API.md](API.md).
 
-**GUI:** Run `python scripts/run_gui.py` for a simple window: query, truth-base/IR paths, top-k, Show IDs/tiers, Skip conflict resolution, Run and Check consistency.
+**Intent-driven helper (primary):** Say what you want (e.g. "I want to junk journal" or "I'm going on a hike"). The app builds a quick corpus from templates (see `config/intent_templates.json`), saves it under `corpus/user_helpers/<id>/`, and you use it locally. Guardrails block illegal/immoral intents. CLI: `python scripts/create_helper_from_intent.py "I want to junk journal"`.
+
+**GUI:** Run `python scripts/run_gui.py`: **What do you want help with?** (create a helper from intent) or pick a **Helper** (My helpers or Prebuilt verticals). Then query, truth-base/IR paths, top-k, Show IDs/tiers, Run and Check consistency.
 
 **Consistency:** Run `python scripts/check_consistency.py --truth-base path/to/truth_base.jsonl` (and/or `--ir path/to/ir.jsonl`). Exit 0 if consistent, 1 if not. Use `--limit N` for large IR files.
 

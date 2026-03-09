@@ -20,6 +20,13 @@ from .godel import (
 )
 from .formal_system import load_axioms, get_theorems, is_consistent, conflicting_pairs, check_consistency_of_paths
 from .ir_bridge import load_ir_jsonl, load_axioms_from_ir, ir_record_to_statement
+from .intent import (
+    check_guardrails,
+    build_quick_corpus,
+    create_helper_from_intent,
+    list_user_helpers,
+    load_intent_templates,
+)
 
 __all__ = [
     "Tier",
@@ -55,4 +62,9 @@ __all__ = [
     "load_ir_jsonl",
     "load_axioms_from_ir",
     "ir_record_to_statement",
+    "check_guardrails",
+    "build_quick_corpus",
+    "create_helper_from_intent",
+    "list_user_helpers",
+    "load_intent_templates",
 ]

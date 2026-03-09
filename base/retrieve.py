@@ -55,18 +55,8 @@ def retrieve_truth_base(
 ) -> list[str]:
     """Return top-k statement texts (tier <= max_tier) by word overlap; tie-break by shorter text."""
     statements = load_truth_base(truth_base_path)
-    statements = [s for s in statements if s.tier <= max_tier]
-    if not statements:
-        return []
-    q_words = _word_set(query)
-    scored = []
-    for s in statements:
-        s_words = _word_set(s.text)
-        overlap = len(q_words & s_words) if q_words else 0
-        simplicity = -len(s.text)
-        scored.append((overlap, -s.tier, simplicity, s.text))
-    scored.sort(key=lambda x: (x[0], x[1], x[2]), reverse=True)
-    return [t for _, _, _, t in scored[:top_k]]
+    result = retrieve_from_statements(query, statements, top_k=top_k, max_tier=max_tier)
+    return [s.text for s in result]
 
 
 def _subject_for_importance(s: Statement) -> str:

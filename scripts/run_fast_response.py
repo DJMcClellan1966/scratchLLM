@@ -43,18 +43,11 @@ def main() -> None:
     ir_path = args.ir
     max_tier = args.max_tier
     if args.vertical:
-        from base.vertical import load_verticals_config, get_vertical, resolve_paths
-        config = load_verticals_config()
-        vertical = get_vertical(config, args.vertical)
-        if vertical:
-            truth_base_path, ir_path, max_tier = resolve_paths(
-                vertical,
-                truth_base_override=args.truth_base,
-                ir_override=args.ir,
-                max_tier_override=args.max_tier,
-                base_dir=ROOT,
-            )
-        else:
+        from base.vertical import resolve_vertical
+        truth_base_path, ir_path, max_tier, found = resolve_vertical(
+            args.vertical, args.truth_base, args.ir, args.max_tier, ROOT
+        )
+        if not found:
             print(f"Unknown vertical: {args.vertical}. Using explicit paths only.", file=sys.stderr)
 
     if not truth_base_path and not ir_path:

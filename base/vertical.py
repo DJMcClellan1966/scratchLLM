@@ -32,6 +32,30 @@ def get_vertical(verticals_config: dict[str, dict[str, Any]], vertical_id: str) 
     return verticals_config.get(vertical_id)
 
 
+def resolve_vertical(
+    vertical_id: str,
+    truth_base_override: Optional[str | Path] = None,
+    ir_override: Optional[str | Path] = None,
+    max_tier_override: Optional[int] = None,
+    base_dir: Optional[Path] = None,
+) -> tuple[Optional[Path], Optional[Path], int, bool]:
+    """
+    Load config, get vertical, resolve paths. Returns (truth_base_path, ir_path, max_tier, vertical_found).
+    When vertical_id is not in config, returns overrides (or None) and vertical_found=False.
+    """
+    config = load_verticals_config()
+    vertical = get_vertical(config, vertical_id)
+    if not vertical:
+        tb = Path(truth_base_override) if truth_base_override else None
+        ir = Path(ir_override) if ir_override else None
+        mt = max_tier_override if max_tier_override is not None else 2
+        return (tb, ir, mt, False)
+    tb, ir, mt = resolve_paths(
+        vertical, truth_base_override, ir_override, max_tier_override, base_dir
+    )
+    return (tb, ir, mt, True)
+
+
 def resolve_paths(
     vertical: dict[str, Any],
     truth_base_override: Optional[str | Path] = None,

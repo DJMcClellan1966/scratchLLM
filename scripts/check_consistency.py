@@ -26,17 +26,11 @@ def main() -> None:
     truth_base_path = args.truth_base
     ir_path = args.ir
     if args.vertical:
-        from base.vertical import load_verticals_config, get_vertical, resolve_paths
-        config = load_verticals_config()
-        vertical = get_vertical(config, args.vertical)
-        if vertical:
-            truth_base_path, ir_path, _ = resolve_paths(
-                vertical,
-                truth_base_override=args.truth_base,
-                ir_override=args.ir,
-                base_dir=ROOT,
-            )
-        else:
+        from base.vertical import resolve_vertical
+        truth_base_path, ir_path, _, found = resolve_vertical(
+            args.vertical, args.truth_base, args.ir, None, ROOT
+        )
+        if not found:
             print(f"Unknown vertical: {args.vertical}. Using explicit paths only.", file=sys.stderr)
 
     if not truth_base_path and not ir_path:

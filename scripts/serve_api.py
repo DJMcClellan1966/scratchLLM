@@ -14,19 +14,30 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 
-def _audit_for_json(audit):
-    """Return audit dict with citation_ids as strings (avoids JSON int digit limit)."""
-    if audit is None:
+def _sanitize_for_json(obj, max_int_bits=4000):
+    """
+    Recursively sanitize for JSON: convert citation_ids lists to list of strings,
+    and any int with bit_length > max_int_bits to str (avoids JSON int digit limit).
+    """
+    if obj is None:
         return None
-    out = dict(audit)
-    if "citation_ids" in out and out["citation_ids"]:
-        out["citation_ids"] = [str(n) for n in out["citation_ids"]]
-    return out
-
-
-def _load_verticals():
-    from base.vertical import load_verticals_config, get_vertical, resolve_paths
-    return load_verticals_config(), get_vertical, resolve_paths
+    if isinstance(obj, dict):
+        out = {}
+        for k, v in obj.items():
+            if k == "citation_ids" and isinstance(v, list):
+                out[k] = [str(x) for x in v]
+            else:
+                out[k] = _sanitize_for_json(v, max_int_bits)
+        return out
+    if isinstance(obj, list):
+        return [_sanitize_for_json(x, max_int_bits) for x in obj]
+    if isinstance(obj, int):
+        try:
+            if obj.bit_length() > max_int_bits or (obj < 0 and (-obj).bit_length() > max_int_bits):
+                return str(obj)
+        except (AttributeError, OverflowError):
+            return str(obj)
+    return obj
 
 
 class QueryHandler(BaseHTTPRequestHandler):
@@ -57,19 +68,11 @@ class QueryHandler(BaseHTTPRequestHandler):
         ir_path = Path(ir_override) if ir_override else None
         if vertical_id:
             try:
-                config, get_vertical, resolve_paths = _load_verticals()
-                vertical = get_vertical(config, vertical_id)
-                if vertical:
-                    tb, ir, mt = resolve_paths(
-                        vertical,
-                        truth_base_override=truth_base_path,
-                        ir_override=ir_path,
-                        max_tier_override=max_tier,
-                        base_dir=ROOT,
-                    )
-                    truth_base_path = tb
-                    ir_path = ir
-                    max_tier = mt
+                from base.vertical import resolve_vertical
+                tb, ir, mt, _ = resolve_vertical(
+                    vertical_id, truth_base_path, ir_path, max_tier, ROOT
+                )
+                truth_base_path, ir_path, max_tier = tb, ir, mt
             except Exception:
                 pass
 
@@ -92,10 +95,11 @@ class QueryHandler(BaseHTTPRequestHandler):
             )
             out = {
                 "response": response_text or "(no matching statements)",
-                "citation_ids": [str(n) for n in citation_ids],
+                "citation_ids": list(citation_ids),
                 "tiers": [getattr(s, "tier", None) for s in resolved],
-                "audit": _audit_for_json(audit),
+                "audit": audit,
             }
+            out = _sanitize_for_json(out)
             self._send_json(200, out)
         except Exception as e:
             self._send_json(500, {"error": str(e)})
@@ -104,23 +108,7 @@ class QueryHandler(BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.end_headers()
-        safe = _strip_large_ints(obj)
-        self.wfile.write(json.dumps(safe, ensure_ascii=False).encode("utf-8"))
-
-
-def _strip_large_ints(obj, max_digits=4000):
-    """Recursively convert ints with more than max_digits to str for JSON (avoids int string limit)."""
-    if isinstance(obj, dict):
-        return {k: _strip_large_ints(v, max_digits) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [_strip_large_ints(x, max_digits) for x in obj]
-    if isinstance(obj, int):
-        try:
-            if obj.bit_length() > max_digits or (obj < 0 and (-obj).bit_length() > max_digits):
-                return str(obj)
-        except (AttributeError, OverflowError):
-            return str(obj)
-    return obj
+        self.wfile.write(json.dumps(obj, ensure_ascii=False).encode("utf-8"))
 
     def log_message(self, format, *args):
         pass

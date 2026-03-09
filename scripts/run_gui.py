@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Simple GUI for formal-only Q&A (truth base + IR). Query, paths, options; Run and Check consistency."""
+"""Simple GUI for formal-only Q&A: create helper from intent (primary) or use prebuilt vertical (secondary)."""
 import sys
 from pathlib import Path
 
@@ -7,10 +7,19 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+USER_HELPERS_DIR = ROOT / "corpus" / "user_helpers"
+
 
 def main() -> None:
     import tkinter as tk
     from tkinter import ttk, filedialog, scrolledtext, messagebox
+
+    def refresh_my_helpers() -> list[dict]:
+        try:
+            from base.intent import list_user_helpers
+            return list_user_helpers(USER_HELPERS_DIR)
+        except Exception:
+            return []
 
     def browse_truth_base() -> None:
         p = filedialog.askopenfilename(
@@ -51,6 +60,10 @@ def main() -> None:
             except (ValueError, tk.TclError):
                 top_k = 5
             include_audit = include_audit_var.get()
+            sel = helper_var.get()
+            vertical_id = None
+            if sel in prebuilt_labels and vertical_ids:
+                vertical_id = vertical_ids[prebuilt_labels.index(sel)]
             result = respond_formal_only(
                 query,
                 truth_base_path=tb or None,
@@ -60,7 +73,7 @@ def main() -> None:
                 resolve=not no_resolve_var.get(),
                 include_audit=include_audit,
                 run_consistency_check=include_audit,
-                vertical_id=vertical_ids[vertical_labels.index(vertical_var.get())] if vertical_var.get() in vertical_labels and vertical_ids else None,
+                vertical_id=vertical_id,
             )
             text = result[0] or "(no matching statements)"
             ids = result[1]
@@ -130,51 +143,106 @@ def main() -> None:
     f = ttk.Frame(root, padding=10)
     f.pack(fill=tk.BOTH, expand=True)
 
-    # Load verticals and build dropdown
-    from base.vertical import load_verticals_config, get_vertical, resolve_paths
+    # Load verticals (prebuilt) and my helpers
+    from base.vertical import load_verticals_config, resolve_vertical
     verticals_config = load_verticals_config()
     vertical_ids = list(verticals_config.keys())
-    vertical_labels = [verticals_config[v].get("label", v) for v in vertical_ids]
+    prebuilt_labels = [verticals_config[v].get("label", v) for v in vertical_ids]
 
-    def on_vertical_change(*_args) -> None:
-        sel = vertical_var.get()
-        if sel not in vertical_labels or not vertical_ids:
+    my_helpers: list[dict] = []  # [{helper_id, truth_base_path, intent}, ...]
+    helper_option_values: list[str] = []  # labels for dropdown: "My: X", "--- Prebuilt ---", "General", ...
+
+    def build_helper_options() -> list[str]:
+        nonlocal my_helpers
+        my_helpers = refresh_my_helpers()
+        opts = [f"My: {h['helper_id']}" for h in my_helpers]
+        if prebuilt_labels:
+            opts.append("--- Prebuilt ---")
+            opts.extend(prebuilt_labels)
+        return opts if opts else ["(No helpers — create one below)"]
+
+    def on_helper_change(*_args) -> None:
+        sel = helper_var.get()
+        if not sel or sel == "(No helpers — create one below)":
             return
-        vid = vertical_ids[vertical_labels.index(sel)]
-        vertical = get_vertical(verticals_config, vid)
-        if vertical:
-            tb_path, ir_path, mt = resolve_paths(vertical, base_dir=ROOT)
+        if sel == "--- Prebuilt ---":
+            return
+        # My helper
+        for h in my_helpers:
+            if f"My: {h['helper_id']}" == sel:
+                truth_base_var.set(h["truth_base_path"])
+                ir_var.set("")
+                max_tier_var.set(2)
+                return
+        # Prebuilt
+        if sel in prebuilt_labels and vertical_ids:
+            vid = vertical_ids[prebuilt_labels.index(sel)]
+            tb_path, ir_path, mt, _ = resolve_vertical(vid, base_dir=ROOT)
             truth_base_var.set(str(tb_path) if tb_path else "")
             ir_var.set(str(ir_path) if ir_path else "")
             max_tier_var.set(mt)
 
-    ttk.Label(f, text="Query:").grid(row=0, column=0, sticky=tk.W)
+    def create_helper() -> None:
+        intent = intent_var.get().strip()
+        if not intent:
+            messagebox.showinfo("Create helper", "Enter what you want help with (e.g. 'I want to junk journal').")
+            return
+        try:
+            from base.intent import create_helper_from_intent
+            helper_id, truth_base_path, count = create_helper_from_intent(
+                intent, out_dir=USER_HELPERS_DIR
+            )
+            helper_option_values[:] = build_helper_options()
+            helper_combo["values"] = helper_option_values
+            helper_var.set(f"My: {helper_id}")
+            truth_base_var.set(str(truth_base_path))
+            ir_var.set("")
+            max_tier_var.set(2)
+            messagebox.showinfo("Create helper", f"Created helper '{helper_id}' with {count} statements.")
+        except ValueError as e:
+            messagebox.showerror("Create helper", str(e))
+
+    helper_option_values[:] = build_helper_options()
+    default_helper = ""
+    if my_helpers:
+        default_helper = f"My: {my_helpers[0]['helper_id']}"
+    elif prebuilt_labels:
+        default_helper = prebuilt_labels[0]
+    elif helper_option_values:
+        default_helper = helper_option_values[0]
+
+    ttk.Label(f, text="What do you want help with?").grid(row=0, column=0, sticky=tk.W)
+    intent_var = tk.StringVar()
+    ttk.Entry(f, textvariable=intent_var, width=50).grid(row=0, column=1, sticky=tk.EW, padx=(5, 5), pady=2)
+    ttk.Button(f, text="Create helper", command=create_helper).grid(row=0, column=2, pady=2)
+
+    ttk.Label(f, text="Query:").grid(row=1, column=0, sticky=tk.W)
     query_var = tk.StringVar()
     query_entry = ttk.Entry(f, textvariable=query_var, width=50)
-    query_entry.grid(row=0, column=1, columnspan=2, sticky=tk.EW, padx=(5, 0), pady=2)
+    query_entry.grid(row=1, column=1, columnspan=2, sticky=tk.EW, padx=(5, 0), pady=2)
 
-    ttk.Label(f, text="Vertical:").grid(row=1, column=0, sticky=tk.W)
-    vertical_var = tk.StringVar(value=vertical_labels[0] if vertical_labels else "General")
-    vertical_combo = ttk.Combobox(f, textvariable=vertical_var, values=vertical_labels, state="readonly", width=42)
-    vertical_combo.grid(row=1, column=1, columnspan=2, sticky=tk.EW, padx=(5, 0), pady=2)
-    vertical_var.trace_add("write", on_vertical_change)
-    if vertical_labels:
-        on_vertical_change()
+    ttk.Label(f, text="Helper:").grid(row=2, column=0, sticky=tk.W)
+    helper_var = tk.StringVar(value=default_helper)
+    helper_combo = ttk.Combobox(f, textvariable=helper_var, values=helper_option_values, state="readonly", width=42)
+    helper_combo.grid(row=2, column=1, columnspan=2, sticky=tk.EW, padx=(5, 0), pady=2)
+    helper_var.trace_add("write", on_helper_change)
+    if default_helper and default_helper != "(No helpers — create one below)":
+        on_helper_change()
 
-    ttk.Label(f, text="Truth base:").grid(row=2, column=0, sticky=tk.W)
+    ttk.Label(f, text="Truth base:").grid(row=3, column=0, sticky=tk.W)
     truth_base_var = tk.StringVar()
-    ttk.Entry(f, textvariable=truth_base_var, width=45).grid(row=2, column=1, sticky=tk.EW, padx=(5, 5), pady=2)
-    ttk.Button(f, text="Browse…", command=browse_truth_base).grid(row=2, column=2, pady=2)
+    ttk.Entry(f, textvariable=truth_base_var, width=45).grid(row=3, column=1, sticky=tk.EW, padx=(5, 5), pady=2)
+    ttk.Button(f, text="Browse…", command=browse_truth_base).grid(row=3, column=2, pady=2)
 
-    ttk.Label(f, text="IR JSONL:").grid(row=3, column=0, sticky=tk.W)
+    ttk.Label(f, text="IR JSONL:").grid(row=4, column=0, sticky=tk.W)
     ir_var = tk.StringVar()
-    ttk.Entry(f, textvariable=ir_var, width=45).grid(row=3, column=1, sticky=tk.EW, padx=(5, 5), pady=2)
-    ttk.Button(f, text="Browse…", command=browse_ir).grid(row=3, column=2, pady=2)
+    ttk.Entry(f, textvariable=ir_var, width=45).grid(row=4, column=1, sticky=tk.EW, padx=(5, 5), pady=2)
+    ttk.Button(f, text="Browse…", command=browse_ir).grid(row=4, column=2, pady=2)
 
     max_tier_var = tk.IntVar(value=2)
 
     opts = ttk.Frame(f)
-    opts.grid(row=4, column=0, columnspan=3, sticky=tk.W, pady=6)
+    opts.grid(row=5, column=0, columnspan=3, sticky=tk.W, pady=6)
     top_k_var = tk.IntVar(value=5)
     ttk.Label(opts, text="Top-k:").pack(side=tk.LEFT)
     tk.Spinbox(opts, from_=1, to=50, width=4, textvariable=top_k_var).pack(side=tk.LEFT, padx=(5, 15))
@@ -190,13 +258,13 @@ def main() -> None:
     ttk.Checkbutton(opts, text="Include audit (citations + consistency)", variable=include_audit_var).pack(side=tk.LEFT, padx=5)
 
     btn_frame = ttk.Frame(f)
-    btn_frame.grid(row=5, column=0, columnspan=3, pady=6)
+    btn_frame.grid(row=6, column=0, columnspan=3, pady=6)
     ttk.Button(btn_frame, text="Run", command=run_query).pack(side=tk.LEFT, padx=2)
     ttk.Button(btn_frame, text="Check consistency", command=check_consistency).pack(side=tk.LEFT, padx=2)
 
-    ttk.Label(f, text="Response:").grid(row=6, column=0, sticky=tk.NW, pady=(10, 2))
+    ttk.Label(f, text="Response:").grid(row=7, column=0, sticky=tk.NW, pady=(10, 2))
     response_text = scrolledtext.ScrolledText(f, wrap=tk.WORD, width=60, height=15)
-    response_text.grid(row=7, column=0, columnspan=3, sticky=tk.NSEW, padx=(5, 0), pady=2)
+    response_text.grid(row=8, column=0, columnspan=3, sticky=tk.NSEW, padx=(5, 0), pady=2)
 
     f.columnconfigure(1, weight=1)
     root.columnconfigure(0, weight=1)

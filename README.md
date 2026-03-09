@@ -64,7 +64,14 @@ python scripts/run_fast_response.py --query "What is X?" --truth-base base/truth
 # or with IR: --ir path/to/pregenerated_ir.jsonl
 ```
 
-**GUI:** `python scripts/run_gui.py` — query box, truth-base/IR paths, options (top-k, show IDs/tiers), Run and Check consistency.
+**Create helper from intent (primary):** Describe what you want help with; the app builds a quick corpus and uses it locally. Nothing illegal or immoral.
+
+```bash
+python scripts/create_helper_from_intent.py "I want to junk journal"
+# Creates corpus/user_helpers/<id>/truth_base.jsonl; use that path or the GUI.
+```
+
+**GUI:** `python scripts/run_gui.py` — **What do you want help with?** (create a helper from your intent) or choose a **Helper** (My helpers or Prebuilt verticals). Query, truth-base/IR paths, Run and Check consistency. After creating a helper, use it with no internet.
 
 **Consistency check:** `python scripts/check_consistency.py --truth-base base/truth_base.jsonl` (or `--ir path/to/ir.jsonl`). Exit 0 if consistent, 1 if not.
 
@@ -78,6 +85,8 @@ Use `--vertical medical`, `--vertical legal`, or `--vertical compliance` for dom
 
 See [docs/FAST_BUILD.md](docs/FAST_BUILD.md) for details. For richer answers, train a model and use `run_inference` with `--use-base --use-meaning`.
 
+**Roadmap:** [docs/ROADMAP_PERSONAL_AI.md](docs/ROADMAP_PERSONAL_AI.md) — intent-driven (primary): you describe what you want → quick corpus → use locally; prebuilt verticals (secondary) for exploring. Phases: refine with user, import, monetization.
+
 ## Project structure
 
 | Path | Purpose |
@@ -88,6 +97,8 @@ See [docs/FAST_BUILD.md](docs/FAST_BUILD.md) for details. For richer answers, tr
 | `model/` | GPT from scratch: causal attention, decoder blocks, LM head |
 | `train/` | Dataset, train config, training loop (CPU-first) |
 | `inference/generate.py` | Load checkpoint + tokenizer, autoregressive generation |
-| `scripts/` | `build_corpus.py`, `train_model.py`, `run_inference.py`, `run_fast_response.py`, `run_gui.py`, `check_consistency.py`, `analyze_axiom_patterns.py` |
+| `scripts/` | `build_corpus.py`, `train_model.py`, `run_inference.py`, `run_fast_response.py`, `run_gui.py`, `create_helper_from_intent.py`, `check_consistency.py`, `analyze_axiom_patterns.py` |
+| `base/intent.py` | Intent guardrails, quick corpus from templates, `create_helper_from_intent`, `list_user_helpers` |
+| `config/intent_templates.json` | Templates (e.g. journaling, hiking) for intent → statements |
 | `base/respond.py` | Formal-only response (no model): `respond_formal_only` |
 | `docs/FAST_BUILD.md` | Fast-build path: formal language + truth base/IR, local/CPU |
