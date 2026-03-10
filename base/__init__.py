@@ -27,6 +27,11 @@ from .intent import (
     list_user_helpers,
     load_intent_templates,
 )
+from .learning import (
+    append_to_truth_base,
+    statements_from_user_note,
+    statements_from_outcome,
+)
 
 __all__ = [
     "Tier",
@@ -67,4 +72,7 @@ __all__ = [
     "create_helper_from_intent",
     "list_user_helpers",
     "load_intent_templates",
+    "append_to_truth_base",
+    "statements_from_user_note",
+    "statements_from_outcome",
 ]

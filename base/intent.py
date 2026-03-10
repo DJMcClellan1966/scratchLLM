@@ -23,6 +23,60 @@ def _default_templates_path() -> Path:
     return Path(__file__).resolve().parent.parent / "config" / "intent_templates.json"
 
 
+def _default_onboarding_terms_path() -> Path:
+    return Path(__file__).resolve().parent.parent / "config" / "onboarding_terms.json"
+
+
+def get_onboarding_definitions(
+    template_id: Optional[str],
+    base_dir: Optional[Path] = None,
+    ir_path: Optional[str | Path] = None,
+    max_definitions: int = 3,
+) -> list[tuple[str, str]]:
+    """
+    Return up to max_definitions (term, definition) for the given template_id for use in onboarding.
+    Loads config/onboarding_terms.json for term list and scans IR JSONL (subject, definition) for matches.
+    """
+    base_dir = base_dir or Path(__file__).resolve().parent.parent
+    terms_path = _default_onboarding_terms_path()
+    if not terms_path.exists():
+        return []
+    try:
+        with open(terms_path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return []
+    if not isinstance(data, dict) or not template_id:
+        return []
+    terms = data.get(template_id)
+    if not isinstance(terms, list):
+        return []
+    terms_lower = [t.lower() for t in terms if isinstance(t, str)]
+    if not terms_lower:
+        return []
+    path = Path(ir_path) if ir_path else base_dir / "corpus" / "rag_ir.jsonl"
+    if not path.exists():
+        return []
+    result: list[tuple[str, str]] = []
+    try:
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                if len(result) >= max_definitions:
+                    break
+                line = line.strip()
+                if not line:
+                    continue
+                rec = json.loads(line)
+                subj = (rec.get("subject") or "").strip().lower()
+                if subj not in terms_lower:
+                    continue
+                defin = (rec.get("definition") or "").strip()[:200]
+                result.append((rec.get("subject", subj), defin))
+    except (json.JSONDecodeError, OSError):
+        pass
+    return result[:max_definitions]
+
+
 def load_intent_templates(path: Optional[str | Path] = None) -> dict[str, dict[str, Any]]:
     """
     Load intent templates from JSON. Returns dict template_id -> {id, label, keywords, statements}.
@@ -106,20 +160,31 @@ def _statements_from_template(
     template: dict[str, Any],
     intent: str,
     add_goal_statement: bool = True,
+    experience_level: Optional[str] = None,
 ) -> list[Statement]:
-    """Build list of Statement from template statements; optionally prepend a goal from intent."""
+    """Build list of Statement from template statements; optionally prepend a goal; filter by experience_level if set."""
     out: list[Statement] = []
     if add_goal_statement and intent.strip():
         goal_text = f"Your stated goal: {intent.strip()}"
+        if experience_level:
+            goal_text += f" You're at {experience_level} level."
         out.append(Statement(text=goal_text, tier=2, source="user", category="intent"))
     for s in template.get("statements") or []:
-        if isinstance(s, dict) and s.get("text"):
-            out.append(Statement(
-                text=s["text"],
-                tier=int(s.get("tier", 2)),
-                source=s.get("source", "curated"),
-                category=s.get("category"),
-            ))
+        if not isinstance(s, dict) or not s.get("text"):
+            continue
+        stmt_level = s.get("level")
+        stmt_levels = s.get("levels")
+        if experience_level and (stmt_level or stmt_levels):
+            if stmt_level and stmt_level != experience_level:
+                continue
+            if stmt_levels and experience_level not in stmt_levels:
+                continue
+        out.append(Statement(
+            text=s["text"],
+            tier=int(s.get("tier", 2)),
+            source=s.get("source", "curated"),
+            category=s.get("category"),
+        ))
     return out
 
 
@@ -157,18 +222,19 @@ def build_quick_corpus(
     add_goal_statement: bool = True,
     base_dir: Optional[Path] = None,
     blank_canvas: bool = False,
+    experience_level: Optional[str] = None,
+    needs_vocabulary: bool = False,
 ) -> list[Statement]:
     """
     Build a quick corpus from user intent. If blank_canvas is True, return only the user's goal
     statement (no template, no merge) so the app is a blank canvas built from their input over time.
-    Otherwise match a template (or generic), add goal statement, and optional merge_ir / merge_truth_base.
+    Otherwise match a template (or generic), add goal statement, filter by experience_level if set,
+    and optional merge_ir / merge_truth_base (and dictionary when needs_vocabulary).
     """
-    goal_only = Statement(
-        text=f"Your stated goal: {intent.strip() or 'General help'}",
-        tier=2,
-        source="user",
-        category="intent",
-    )
+    goal_text = f"Your stated goal: {intent.strip() or 'General help'}."
+    if experience_level:
+        goal_text += f" You're at {experience_level} level."
+    goal_only = Statement(text=goal_text, tier=2, source="user", category="intent")
     if blank_canvas:
         return [goal_only]
     templates = templates or load_intent_templates(templates_path)
@@ -176,13 +242,20 @@ def build_quick_corpus(
     template = (templates.get(template_id) or templates.get("general")) if templates else None
     if not template:
         return [goal_only]
-    statements = _statements_from_template(template, intent, add_goal_statement=add_goal_statement)
+    statements = _statements_from_template(
+        template, intent, add_goal_statement=add_goal_statement, experience_level=experience_level
+    )
     merge_limit = int(template.get("merge_limit", 500))
     for key in ("merge_truth_base", "merge_ir"):
         path = template.get(key)
         if path and isinstance(path, str):
             extra = _load_merge_statements(path, base_dir=base_dir, limit=merge_limit)
             statements.extend(extra)
+    if needs_vocabulary and not (template.get("merge_ir") or template.get("merge_truth_base")):
+        dict_path = "corpus/rag_ir.jsonl"
+        vocab_limit = min(merge_limit, 300)
+        extra = _load_merge_statements(dict_path, base_dir=base_dir, limit=vocab_limit)
+        statements.extend(extra)
     return statements
 
 
@@ -202,19 +275,28 @@ def create_helper_from_intent(
     helper_id: Optional[str] = None,
     base_dir: Optional[Path] = None,
     blank_canvas: bool = False,
+    experience_level: Optional[str] = None,
+    needs_vocabulary: bool = False,
 ) -> tuple[str, Path, int]:
     """
     Run guardrails, build quick corpus, save to out_dir/<id>/ and return (helper_id, truth_base_path, statement_count).
     Raises ValueError if guardrails reject the intent.
     If blank_canvas is True, the helper contains only the user's goal (no template content); the app is a blank canvas.
     Otherwise templates may specify merge_ir or merge_truth_base to merge in dictionary/IR content.
+    experience_level: "beginner" | "some_experience" | "advanced" (optional, for onboarding).
+    needs_vocabulary: if True, merge dictionary/IR for definitions when building corpus (when not blank_canvas).
     """
     allowed, msg = check_guardrails(intent)
     if not allowed:
         raise ValueError(msg)
     base_dir = base_dir or Path(__file__).resolve().parent.parent
     statements = build_quick_corpus(
-        intent, templates_path=templates_path, base_dir=base_dir, blank_canvas=blank_canvas
+        intent,
+        templates_path=templates_path,
+        base_dir=base_dir,
+        blank_canvas=blank_canvas,
+        experience_level=experience_level,
+        needs_vocabulary=needs_vocabulary,
     )
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -234,6 +316,10 @@ def create_helper_from_intent(
         "helper_id": slug,
         "statement_count": len(statements),
     }
+    if experience_level is not None:
+        meta["experience_level"] = experience_level
+    if needs_vocabulary:
+        meta["needs_vocabulary"] = True
     meta_path = helper_dir / "meta.json"
     with open(meta_path, "w", encoding="utf-8") as f:
         json.dump(meta, f, ensure_ascii=False, indent=2)
@@ -256,16 +342,22 @@ def list_user_helpers(out_dir: str | Path) -> list[dict[str, Any]]:
             continue
         meta_path = d / "meta.json"
         intent = ""
+        experience_level = None
+        needs_vocabulary = False
         if meta_path.exists():
             try:
                 with open(meta_path, encoding="utf-8") as f:
                     m = json.load(f)
                 intent = m.get("intent", "")
+                experience_level = m.get("experience_level")
+                needs_vocabulary = m.get("needs_vocabulary", False)
             except Exception:
                 pass
         result.append({
             "helper_id": d.name,
             "truth_base_path": str(tb),
             "intent": intent,
+            "experience_level": experience_level,
+            "needs_vocabulary": needs_vocabulary,
         })
     return result

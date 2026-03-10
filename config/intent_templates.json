@@ -9,6 +9,7 @@
     "default_action_queries": ["What should I read today?", "Give me a reflection prompt"],
     "keywords": ["bible", "daily reading", "devotional", "scripture", "read the bible", "bible daily"],
     "statements": [
+      {"text": "You're just starting — that's great. A little reading each day adds up.", "tier": 2, "source": "curated", "category": "bible_daily", "level": "beginner"},
       {"text": "Daily Bible reading builds a habit: choose a time and place, and start with a short passage.", "tier": 1, "source": "curated", "category": "bible_daily"},
       {"text": "Reflect after reading: What stood out? How does this apply to today?", "tier": 1, "source": "curated", "category": "bible_daily"},
       {"text": "You can follow a reading plan (e.g. chronological, thematic) or read one book at a time.", "tier": 2, "source": "curated", "category": "bible_daily"},
@@ -70,12 +71,96 @@
       {"text": "Yoga is not about flexibility; it is about awareness, breath, and gradual progress.", "tier": 0, "source": "curated", "category": "yoga"}
     ]
   },
+  "gardening": {
+    "id": "gardening",
+    "label": "Gardening & plants",
+    "placeholder": "Ask about plants, soil, sun, or experiments…",
+    "welcome_headline": "Your gardening helper",
+    "accent_color": "#3d7a3d",
+    "default_actions": ["Suggest experiment"],
+    "default_action_queries": ["Suggest 1–2 experiments or next steps based on my goals and what I've tried."],
+    "keywords": ["garden", "gardening", "urban garden", "low-maintenance", "plants", "grow", "vegetable", "herb", "balcony", "indoor"],
+    "merge_ir": "corpus/rag_ir.jsonl",
+    "merge_limit": 300,
+    "merge_dictionary_for_language": true,
+    "statements": [
+      {"text": "You're just starting — that's great. Small steps build lasting habits; every plant you try teaches you something.", "tier": 2, "source": "curated", "category": "gardening", "level": "beginner"},
+      {"text": "A low-maintenance urban garden focuses on hardy plants, good soil, and consistent but minimal care.", "tier": 1, "source": "curated", "category": "gardening"},
+      {"text": "Match plants to light: note sun direction and hours; many herbs and greens do well in part sun.", "tier": 1, "source": "curated", "category": "gardening"},
+      {"text": "Water consistently but avoid overwatering; let soil dry slightly between waterings for most plants.", "tier": 1, "source": "curated", "category": "gardening"},
+      {"text": "Try one new plant or spot per season so you can learn what works in your space.", "tier": 2, "source": "curated", "category": "gardening"},
+      {"text": "Track what works: note sun, water, and failures so you can adapt. Suggest one small experiment at a time; track result and adjust.", "tier": 2, "source": "curated", "category": "gardening"},
+      {"text": "Containers and raised beds suit balconies and small spaces; use quality potting mix and drainage.", "tier": 1, "source": "curated", "category": "gardening"},
+      {"text": "You're building real skills. Keep experimenting — your garden will reflect what you learn.", "tier": 2, "source": "curated", "category": "gardening", "level": "some_experience"},
+      {"text": "Suggest 1–2 small experiments based on the user's goal and constraints; then they can record outcomes.", "tier": 2, "source": "curated", "category": "gardening"}
+    ]
+  },
+  "home_brewing": {
+    "id": "home_brewing",
+    "label": "Home brewing",
+    "placeholder": "Ask about recipes, sanitation, or experiments…",
+    "welcome_headline": "Your brewing helper",
+    "accent_color": "#8B4513",
+    "default_actions": ["Suggest experiment"],
+    "default_action_queries": ["Suggest 1–2 experiments or next steps based on my goals and what I've tried."],
+    "keywords": ["brewing", "home brew", "beer", "ferment", "recipe", "batch"],
+    "statements": [
+      {"text": "Sanitation is critical: clean and sanitize all equipment before use to avoid off flavors and infection.", "tier": 0, "source": "curated", "category": "home_brewing"},
+      {"text": "Start with a simple recipe (e.g. single-malt, one hop) to learn the process before varying.", "tier": 1, "source": "curated", "category": "home_brewing"},
+      {"text": "Good experiments: try one variable per batch (e.g. hop timing, yeast, temperature) and note results.", "tier": 2, "source": "curated", "category": "home_brewing"},
+      {"text": "Suggest one small experiment at a time; track result and adjust. Record what worked and what didn't.", "tier": 2, "source": "curated", "category": "home_brewing"},
+      {"text": "Fermentation temperature affects flavor; keep consistent and record it for each batch.", "tier": 1, "source": "curated", "category": "home_brewing"},
+      {"text": "Take notes on each batch: recipe, dates, temps, and tasting notes so you can repeat or improve.", "tier": 2, "source": "curated", "category": "home_brewing"}
+    ]
+  },
+  "music_production": {
+    "id": "music_production",
+    "label": "Music production",
+    "placeholder": "Ask about workflow, techniques, or experiments…",
+    "welcome_headline": "Your production helper",
+    "accent_color": "#6a5acd",
+    "default_actions": ["Suggest experiment"],
+    "default_action_queries": ["Suggest 1–2 experiments or next steps based on my goals and what I've tried."],
+    "keywords": ["music production", "lo-fi", "beats", "DAW", "mix", "produce"],
+    "statements": [
+      {"text": "A lo-fi beats producer often uses sampled drums, warm keys, and tape-style saturation for a relaxed feel.", "tier": 1, "source": "curated", "category": "music_production"},
+      {"text": "Workflow: start with a loop or sketch, then build structure; finish one track before piling on new ideas.", "tier": 2, "source": "curated", "category": "music_production"},
+      {"text": "Experiments: try one new technique per track (e.g. sidechain, filter sweep); note what fits your style.", "tier": 2, "source": "curated", "category": "music_production"},
+      {"text": "Suggest one small experiment at a time; track result and adjust. Record what worked and what didn't.", "tier": 2, "source": "curated", "category": "music_production"},
+      {"text": "Reference tracks: compare your mix to songs you like; note levels, width, and balance.", "tier": 1, "source": "curated", "category": "music_production"},
+      {"text": "Export and listen on different devices and environments to catch mix issues early.", "tier": 2, "source": "curated", "category": "music_production"}
+    ]
+  },
+  "birdwatching": {
+    "id": "birdwatching",
+    "label": "Birdwatching",
+    "placeholder": "Ask about species, checklists, or seasonal tips…",
+    "welcome_headline": "Your birding helper",
+    "accent_color": "#2e6b2e",
+    "default_actions": ["Suggest experiment"],
+    "default_action_queries": ["Suggest 1–2 experiments or next steps based on my goals and what I've tried."],
+    "keywords": ["bird", "birdwatching", "birding", "species", "checklist", "migration"],
+    "merge_ir": "corpus/rag_ir.jsonl",
+    "merge_limit": 300,
+    "merge_dictionary_for_language": true,
+    "statements": [
+      {"text": "You're just starting — that's great. Small steps build lasting habits; enjoy the journey.", "tier": 2, "source": "curated", "category": "birdwatching", "level": "beginner"},
+      {"text": "Get started with a field guide or app; learn a few common species in your area first.", "tier": 1, "source": "curated", "category": "birdwatching", "level": "beginner"},
+      {"text": "Keep a checklist or log: species, date, location, and conditions help you see patterns over time.", "tier": 2, "source": "curated", "category": "birdwatching"},
+      {"text": "Migration seasons bring new species; note when and where you see them to learn seasonal patterns.", "tier": 1, "source": "curated", "category": "birdwatching"},
+      {"text": "Track sightings and conditions; note patterns over seasons. Suggest one small experiment (e.g. new spot, time of day) and record results.", "tier": 2, "source": "curated", "category": "birdwatching"},
+      {"text": "Binoculars and quiet observation: move slowly, avoid startling birds, and note behavior and habitat.", "tier": 1, "source": "curated", "category": "birdwatching"},
+      {"text": "You're building real skills. Keep going — your checklist and notes will reward you over time.", "tier": 2, "source": "curated", "category": "birdwatching", "level": "some_experience"},
+      {"text": "Suggest 1–2 small experiments based on the user's goal (e.g. new location, checklist goal); then they can record outcomes.", "tier": 2, "source": "curated", "category": "birdwatching"}
+    ]
+  },
   "general": {
     "id": "general",
     "label": "General helper",
     "placeholder": "Ask anything…",
     "keywords": [],
     "statements": [
+      {"text": "You're taking a good step. Small progress is still progress.", "tier": 2, "source": "curated", "category": "general", "level": "beginner"},
       {"text": "Set a clear goal for what you want to achieve; write it down so you can refer back.", "tier": 2, "source": "curated", "category": "general"},
       {"text": "Break large tasks into smaller steps; tackle one step at a time.", "tier": 2, "source": "curated", "category": "general"},
       {"text": "Review and refine your goals periodically; adjust as you learn what works for you.", "tier": 2, "source": "curated", "category": "general"}

@@ -1,0 +1,10 @@
+{
+  "birdwatching": ["migration", "species", "checklist", "habitat"],
+  "gardening": ["soil", "drainage", "perennial", "annual"],
+  "bible_daily": ["scripture", "devotional", "reflection"],
+  "hiking": ["trail", "elevation", "leave no trace"],
+  "yoga": ["pose", "breathwork", "savasana"],
+  "journaling": ["prompt", "freewrite", "bullet journal"],
+  "home_brewing": ["fermentation", "sanitation", "batch"],
+  "music_production": ["DAW", "mix", "lo-fi"]
+}

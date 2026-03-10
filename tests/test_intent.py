@@ -8,6 +8,7 @@ from base.intent import (
     check_guardrails,
     build_quick_corpus,
     create_helper_from_intent,
+    get_onboarding_definitions,
     list_user_helpers,
     load_intent_templates,
 )
@@ -80,6 +81,24 @@ def test_create_helper_from_intent_guardrails_raise():
             create_helper_from_intent("I want to harm someone", out_dir=tmp)
 
 
+def test_create_helper_from_intent_with_onboarding():
+    with tempfile.TemporaryDirectory() as tmp:
+        helper_id, truth_base_path, count = create_helper_from_intent(
+            "I want to learn birdwatching",
+            out_dir=tmp,
+            blank_canvas=False,
+            experience_level="beginner",
+            needs_vocabulary=False,
+        )
+        assert count >= 1
+        meta_path = truth_base_path.parent / "meta.json"
+        assert meta_path.exists()
+        with open(meta_path, encoding="utf-8") as f:
+            import json
+            meta = json.load(f)
+        assert meta.get("experience_level") == "beginner"
+        assert meta.get("needs_vocabulary", False) is False
+
 def test_list_user_helpers():
     with tempfile.TemporaryDirectory() as tmp:
         create_helper_from_intent("I want to hike", out_dir=tmp)
@@ -87,3 +106,15 @@ def test_list_user_helpers():
         assert len(helpers) >= 1
         assert "helper_id" in helpers[0]
         assert "truth_base_path" in helpers[0]
+        assert "experience_level" in helpers[0]
+        assert "needs_vocabulary" in helpers[0]
+
+
+def test_get_onboarding_definitions():
+    defs = get_onboarding_definitions("birdwatching", max_definitions=1)
+    assert isinstance(defs, list)
+    if defs:
+        assert len(defs) <= 1
+        assert isinstance(defs[0], tuple) and len(defs[0]) == 2
+    defs_none = get_onboarding_definitions(None)
+    assert defs_none == []
